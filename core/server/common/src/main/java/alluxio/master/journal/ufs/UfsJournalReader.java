@@ -13,7 +13,6 @@ package alluxio.master.journal.ufs;
 
 import alluxio.ProcessUtils;
 import alluxio.exception.ExceptionMessage;
-import alluxio.master.journal.checkpoint.CheckpointInputStream;
 import alluxio.master.journal.JournalEntryStreamReader;
 import alluxio.master.journal.JournalReader;
 import alluxio.proto.journal.Journal;
@@ -27,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
@@ -61,7 +61,7 @@ public final class UfsJournalReader implements JournalReader {
   private boolean mClosed;
 
   /** The next checkpoint to install. */
-  private CheckpointInputStream mCheckpointStream;
+  private InputStream mCheckpointStream;
 
   /** The next entry to apply. */
   private JournalEntry mNextEntry;
@@ -136,7 +136,7 @@ public final class UfsJournalReader implements JournalReader {
   }
 
   @Override
-  public CheckpointInputStream getCheckpoint() {
+  public InputStream getCheckpoint() {
     return Preconditions.checkNotNull(mCheckpointStream, "mCheckpointStream");
   }
 
@@ -227,10 +227,8 @@ public final class UfsJournalReader implements JournalReader {
       if (!snapshot.getCheckpoints().isEmpty()) {
         UfsJournalFile checkpoint = snapshot.getLatestCheckpoint();
         if (mNextSequenceNumber < checkpoint.getEnd()) {
-          String location = checkpoint.getLocation().toString();
-          LOG.info("Reading checkpoint {}", location);
-          mCheckpointStream = new CheckpointInputStream(
-              mUfs.open(location, OpenOptions.defaults().setRecoverFailedOpen(true)));
+          mCheckpointStream = mUfs.open(checkpoint.getLocation().toString(),
+              OpenOptions.defaults().setRecoverFailedOpen(true));
           mNextSequenceNumber = checkpoint.getEnd();
         }
         for (; index < snapshot.getLogs().size(); index++) {

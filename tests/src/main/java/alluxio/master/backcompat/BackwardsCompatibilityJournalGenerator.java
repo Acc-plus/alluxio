@@ -15,7 +15,6 @@ import alluxio.AlluxioURI;
 import alluxio.Constants;
 import alluxio.ProjectConstants;
 import alluxio.conf.ServerConfiguration;
-import alluxio.grpc.BackupPOptions;
 import alluxio.master.backcompat.ops.AsyncPersist;
 import alluxio.master.backcompat.ops.CreateDirectory;
 import alluxio.master.backcompat.ops.CreateFile;
@@ -120,9 +119,7 @@ public final class BackwardsCompatibilityJournalGenerator {
         op.apply(cluster.getClients());
       }
       AlluxioURI backup = cluster.getMetaMasterClient()
-          .backup(BackupPOptions.newBuilder()
-              .setTargetDirectory(new File(generator.getOutputDirectory()).getAbsolutePath())
-              .setLocalFileSystem(true).build())
+          .backup(new File(generator.getOutputDirectory()).getAbsolutePath(), true)
           .getBackupUri();
       FileUtils.moveFile(new File(backup.getPath()), backupDst);
       cluster.stopMasters();

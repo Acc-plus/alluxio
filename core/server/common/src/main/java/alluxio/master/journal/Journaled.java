@@ -11,11 +11,10 @@
 
 package alluxio.master.journal;
 
-import alluxio.master.journal.checkpoint.CheckpointInputStream;
-import alluxio.master.journal.checkpoint.Checkpointed;
 import alluxio.proto.journal.Journal.JournalEntry;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.function.Supplier;
 
@@ -57,7 +56,7 @@ public interface Journaled extends Checkpointed, JournalEntryIterable {
   }
 
   @Override
-  default void restoreFromCheckpoint(CheckpointInputStream input) throws IOException {
+  default void restoreFromCheckpoint(InputStream input) throws IOException {
     JournalUtils.restoreJournalEntryCheckpoint(input, this);
   }
 }

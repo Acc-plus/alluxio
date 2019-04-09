@@ -17,7 +17,6 @@ import alluxio.client.AbstractOutStream;
 import alluxio.client.AlluxioStorageType;
 import alluxio.client.UnderStorageType;
 import alluxio.client.block.AlluxioBlockStore;
-import alluxio.client.block.policy.options.GetWorkerOptions;
 import alluxio.client.block.stream.BlockOutStream;
 import alluxio.client.block.stream.UnderFileSystemFileOutStream;
 import alluxio.client.file.options.OutStreamOptions;
@@ -30,7 +29,6 @@ import alluxio.metrics.WorkerMetrics;
 import alluxio.resource.CloseableResource;
 import alluxio.util.CommonUtils;
 import alluxio.util.FileSystemOptions;
-import alluxio.wire.BlockInfo;
 import alluxio.wire.WorkerNetAddress;
 
 import com.codahale.metrics.Counter;
@@ -99,17 +97,11 @@ public class FileOutStream extends AbstractOutStream {
     mCanceled = false;
     mShouldCacheCurrentBlock = mAlluxioStorageType.isStore();
     mBytesWritten = 0;
-
     if (!mUnderStorageType.isSyncPersist()) {
       mUnderStorageOutputStream = null;
     } else { // Write is through to the under storage, create mUnderStorageOutputStream.
-      GetWorkerOptions getWorkerOptions = GetWorkerOptions.defaults()
-          .setBlockWorkerInfos(mBlockStore.getEligibleWorkers())
-          .setBlockInfo(new BlockInfo()
-              .setBlockId(-1)
-              .setLength(0)); // not storing data to Alluxio, so block size is 0
-      WorkerNetAddress workerNetAddress =
-          options.getLocationPolicy().getWorker(getWorkerOptions);
+      WorkerNetAddress workerNetAddress = // not storing data to Alluxio, so block size is 0
+          options.getLocationPolicy().getWorkerForNextBlock(mBlockStore.getEligibleWorkers(), 0);
       if (workerNetAddress == null) {
         // Assume no worker is available because block size is 0.
         throw new UnavailableException(ExceptionMessage.NO_WORKER_AVAILABLE.getMessage());

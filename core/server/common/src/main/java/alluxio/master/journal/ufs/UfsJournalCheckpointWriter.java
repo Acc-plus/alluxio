@@ -74,11 +74,6 @@ final class UfsJournalCheckpointWriter extends FilterOutputStream {
   }
 
   @Override
-  public void write(byte[] b, int offset, int length) throws IOException {
-    out.write(b, offset, length);
-  }
-
-  @Override
   public void close() throws IOException {
     if (mClosed) {
       return;

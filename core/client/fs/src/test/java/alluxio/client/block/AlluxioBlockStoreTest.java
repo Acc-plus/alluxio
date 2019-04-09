@@ -13,7 +13,6 @@ package alluxio.client.block;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +28,7 @@ import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.options.InStreamOptions;
 import alluxio.client.file.options.OutStreamOptions;
+import alluxio.client.file.policy.FileWriteLocationPolicy;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.conf.InstancedConfiguration;
 import alluxio.conf.PropertyKey;
@@ -38,7 +38,6 @@ import alluxio.exception.PreconditionMessage;
 import alluxio.exception.status.UnavailableException;
 import alluxio.grpc.CreateLocalBlockResponse;
 import alluxio.grpc.OpenFilePOptions;
-import alluxio.grpc.OpenLocalBlockRequest;
 import alluxio.grpc.OpenLocalBlockResponse;
 import alluxio.network.TieredIdentityFactory;
 import alluxio.resource.DummyCloseableResource;
@@ -103,20 +102,20 @@ public final class AlluxioBlockStoreTest {
       .setHost(WORKER_HOSTNAME_REMOTE);
   private ClientCallStreamObserver mStreamObserver;
   private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
-  private StreamObserver<OpenLocalBlockResponse> mResponseObserver;
 
   /**
    * A mock class used to return controlled result when selecting workers.
    */
   @ThreadSafe
-  private static class MockBlockLocationPolicy implements BlockLocationPolicy {
+  private static class MockFileWriteLocationPolicy
+      implements FileWriteLocationPolicy, BlockLocationPolicy {
     private List<WorkerNetAddress> mWorkerNetAddresses;
     private int mIndex;
 
     /**
      * Cosntructs this mock location policy with empty host list.
      */
-    public MockBlockLocationPolicy(AlluxioConfiguration conf) {
+    public MockFileWriteLocationPolicy(AlluxioConfiguration alluxioConf) {
       mIndex = 0;
       mWorkerNetAddresses =  Collections.emptyList();
     }
@@ -126,7 +125,7 @@ public final class AlluxioBlockStoreTest {
      *
      * @param addresses list of addresses this mock policy will return
      */
-    public MockBlockLocationPolicy(List<WorkerNetAddress> addresses) {
+    public MockFileWriteLocationPolicy(List<WorkerNetAddress> addresses) {
       mWorkerNetAddresses = Lists.newArrayList(addresses);
       mIndex = 0;
     }
@@ -137,11 +136,17 @@ public final class AlluxioBlockStoreTest {
     }
 
     @Override
-    public WorkerNetAddress getWorker(GetWorkerOptions options) {
+    public WorkerNetAddress getWorkerForNextBlock(Iterable<BlockWorkerInfo> workerInfoList,
+        long blockSizeBytes) {
       if (mWorkerNetAddresses.isEmpty()) {
         return null;
       }
       return mWorkerNetAddresses.get(mIndex++);
+    }
+
+    @Override
+    public WorkerNetAddress getWorker(GetWorkerOptions options) {
+      return getWorkerForNextBlock(options.getBlockWorkerInfos(), options.getBlockSize());
     }
   }
 
@@ -184,7 +189,7 @@ public final class AlluxioBlockStoreTest {
   @Test
   public void getOutStreamUsingLocationPolicy() throws Exception {
     OutStreamOptions options = OutStreamOptions.defaults(sConf).setWriteType(WriteType.MUST_CACHE)
-        .setLocationPolicy((workerOptions) -> {
+        .setLocationPolicy((workerInfoList, blockSizeBytes) -> {
           throw new RuntimeException("policy threw exception");
         });
     mException.expect(Exception.class);
@@ -197,8 +202,7 @@ public final class AlluxioBlockStoreTest {
         OutStreamOptions.defaults(sConf).setBlockSizeBytes(BLOCK_LENGTH)
             .setWriteType(WriteType.MUST_CACHE).setLocationPolicy(null);
     mException.expect(NullPointerException.class);
-    mException.expectMessage(
-        PreconditionMessage.BLOCK_WRITE_LOCATION_POLICY_UNSPECIFIED.toString());
+    mException.expectMessage(PreconditionMessage.FILE_WRITE_LOCATION_POLICY_UNSPECIFIED.toString());
     mBlockStore.getOutStream(BLOCK_ID, BLOCK_LENGTH, options);
   }
 
@@ -210,7 +214,7 @@ public final class AlluxioBlockStoreTest {
             .setBlockSizeBytes(BLOCK_LENGTH)
             .setWriteType(WriteType.MUST_CACHE)
             .setLocationPolicy(
-                new MockBlockLocationPolicy(Lists.<WorkerNetAddress>newArrayList()));
+                new MockFileWriteLocationPolicy(Lists.<WorkerNetAddress>newArrayList()));
     mException.expect(UnavailableException.class);
     mException
         .expectMessage(ExceptionMessage.NO_SPACE_FOR_BLOCK_ON_WORKER.getMessage(BLOCK_LENGTH));
@@ -233,7 +237,7 @@ public final class AlluxioBlockStoreTest {
         });
 
     OutStreamOptions options = OutStreamOptions.defaults(sConf).setBlockSizeBytes(BLOCK_LENGTH)
-        .setLocationPolicy(new MockBlockLocationPolicy(
+        .setLocationPolicy(new MockFileWriteLocationPolicy(
             Lists.newArrayList(WORKER_NET_ADDRESS_LOCAL)))
         .setWriteType(WriteType.MUST_CACHE);
     BlockOutStream stream = mBlockStore.getOutStream(BLOCK_ID, BLOCK_LENGTH, options);
@@ -245,7 +249,7 @@ public final class AlluxioBlockStoreTest {
     WorkerNetAddress worker1 = new WorkerNetAddress().setHost("worker1");
     WorkerNetAddress worker2 = new WorkerNetAddress().setHost("worker2");
     OutStreamOptions options = OutStreamOptions.defaults(sConf).setBlockSizeBytes(BLOCK_LENGTH)
-        .setLocationPolicy(new MockBlockLocationPolicy(Arrays.asList(worker1, worker2)))
+        .setLocationPolicy(new MockFileWriteLocationPolicy(Arrays.asList(worker1, worker2)))
         .setWriteType(WriteType.MUST_CACHE);
     BlockOutStream stream1 = mBlockStore.getOutStream(BLOCK_ID, BLOCK_LENGTH, options);
     assertEquals(worker1, stream1.getAddress());
@@ -272,7 +276,7 @@ public final class AlluxioBlockStoreTest {
         .newArrayList(new alluxio.wire.WorkerInfo().setAddress(WORKER_NET_ADDRESS_LOCAL),
             new alluxio.wire.WorkerInfo().setAddress(WORKER_NET_ADDRESS_REMOTE)));
     OutStreamOptions options = OutStreamOptions.defaults(sConf).setBlockSizeBytes(BLOCK_LENGTH)
-        .setLocationPolicy(new MockBlockLocationPolicy(
+        .setLocationPolicy(new MockFileWriteLocationPolicy(
             Lists.newArrayList(WORKER_NET_ADDRESS_LOCAL, WORKER_NET_ADDRESS_REMOTE)))
         .setWriteType(WriteType.MUST_CACHE).setReplicationMin(2);
     BlockOutStream stream = mBlockStore.getOutStream(BLOCK_ID, BLOCK_LENGTH, options);
@@ -288,11 +292,10 @@ public final class AlluxioBlockStoreTest {
     URIStatus dummyStatus =
         new URIStatus(new FileInfo().setPersisted(true).setBlockIds(Collections.singletonList(0L))
             .setFileBlockInfos(Collections.singletonList(new FileBlockInfo().setBlockInfo(info))));
-    sConf.set(PropertyKey.USER_UFS_BLOCK_READ_LOCATION_POLICY,
-        MockBlockLocationPolicy.class.getTypeName());
-    OpenFilePOptions readOptions = OpenFilePOptions.newBuilder().build();
+    OpenFilePOptions readOptions = OpenFilePOptions.newBuilder()
+        .setFileReadLocationPolicy(MockFileWriteLocationPolicy.class.getTypeName()).build();
     InStreamOptions options = new InStreamOptions(dummyStatus, readOptions, sConf);
-    ((MockBlockLocationPolicy) options.getUfsReadLocationPolicy())
+    ((MockFileWriteLocationPolicy) options.getUfsReadLocationPolicy())
         .setHosts(Arrays.asList(worker1, worker2));
     when(mMasterClient.getBlockInfo(BLOCK_ID)).thenReturn(new BlockInfo());
     when(mMasterClient.getWorkerInfoList()).thenReturn(
@@ -340,15 +343,16 @@ public final class AlluxioBlockStoreTest {
 
     // Mock away gRPC usage.
     OpenLocalBlockResponse response = OpenLocalBlockResponse.newBuilder().setPath("/tmp").build();
-    when(mWorkerClient.openLocalBlock(any(StreamObserver.class))).thenAnswer(invocation -> {
-      mResponseObserver = invocation.getArgumentAt(0, StreamObserver.class);
-      return mStreamObserver;
-    });
-    doAnswer(invocation -> {
-      mResponseObserver.onNext(response);
-      mResponseObserver.onCompleted();
-      return null;
-    }).when(mStreamObserver).onNext(any(OpenLocalBlockRequest.class));
+    when(mWorkerClient.openLocalBlock(any(StreamObserver.class)))
+            .thenAnswer(new Answer() {
+              public Object answer(InvocationOnMock invocation) {
+                StreamObserver<OpenLocalBlockResponse> observer =
+                        invocation.getArgumentAt(0, StreamObserver.class);
+                observer.onNext(response);
+                observer.onCompleted();
+                return mStreamObserver;
+              }
+            });
 
     BlockInfo info = new BlockInfo().setBlockId(BLOCK_ID).setLocations(Arrays
         .asList(new BlockLocation().setWorkerAddress(remote),

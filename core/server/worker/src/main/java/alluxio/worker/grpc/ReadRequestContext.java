@@ -42,7 +42,6 @@ public class ReadRequestContext<T extends ReadRequest> {
    */
   private long mPosToQueue;
 
-  private long mPosReceived;
   /**
    * mEof, mCancel and mError are the notifications processed by the data reader thread. They can
    * be set by either the gRPC I/O thread or the data reader thread. mError overrides mCancel
@@ -114,14 +113,6 @@ public class ReadRequestContext<T extends ReadRequest> {
   }
 
   /**
-   * @return the position before which data are received by the client
-   */
-  @GuardedBy("AbstractReadHandler#mLock")
-  public long getPosReceived() {
-    return mPosReceived;
-  }
-
-  /**
    * @return true when the data reader replies a SUCCESS response, false otherwise
    */
   @GuardedBy("AbstractReadHandler#mLock")
@@ -183,14 +174,6 @@ public class ReadRequestContext<T extends ReadRequest> {
   @GuardedBy("AbstractReadHandler#mLock")
   public void setPosToQueue(long posToQueue) {
     mPosToQueue = posToQueue;
-  }
-
-  /**
-   * @param posReceived the position before which data are received by the client
-   */
-  @GuardedBy("AbstractReadHandler#mLock")
-  public void setPosReceived(long posReceived) {
-    mPosReceived = posReceived;
   }
 
   /**

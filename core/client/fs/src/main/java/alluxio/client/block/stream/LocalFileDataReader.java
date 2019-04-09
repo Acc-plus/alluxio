@@ -101,7 +101,6 @@ public final class LocalFileDataReader implements DataReader {
     private final long mLocalReaderChunkSize;
     private final int mReadBufferSize;
     private final GrpcBlockingStream<OpenLocalBlockRequest, OpenLocalBlockResponse> mStream;
-
     private LocalFileBlockReader mReader;
     private final long mDataTimeoutMs;
     private boolean mClosed;

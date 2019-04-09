@@ -12,7 +12,6 @@
 package alluxio.client.block.stream;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import alluxio.ClientContext;
@@ -23,7 +22,6 @@ import alluxio.conf.PropertyKey;
 import alluxio.client.file.FileSystemContext;
 import alluxio.client.file.URIStatus;
 import alluxio.client.file.options.InStreamOptions;
-import alluxio.grpc.OpenLocalBlockRequest;
 import alluxio.grpc.OpenLocalBlockResponse;
 import alluxio.util.network.NettyUtils;
 import alluxio.wire.BlockInfo;
@@ -56,7 +54,6 @@ public class BlockInStreamTest {
   private BlockInfo mInfo;
   private InStreamOptions mOptions;
   private InstancedConfiguration mConf = ConfigurationTestUtils.defaults();
-  private StreamObserver<OpenLocalBlockResponse> mResponseObserver;
 
   @Before
   public void before() throws Exception {
@@ -66,15 +63,13 @@ public class BlockInStreamTest {
     when(workerClient.openLocalBlock(any(StreamObserver.class)))
         .thenAnswer(new Answer() {
           public Object answer(InvocationOnMock invocation) {
-            mResponseObserver = invocation.getArgumentAt(0, StreamObserver.class);
+            StreamObserver<OpenLocalBlockResponse> observer =
+                invocation.getArgumentAt(0, StreamObserver.class);
+            observer.onNext(OpenLocalBlockResponse.newBuilder().setPath("/tmp").build());
+            observer.onCompleted();
             return requestObserver;
           }
         });
-    doAnswer(invocation -> {
-      mResponseObserver.onNext(OpenLocalBlockResponse.newBuilder().setPath("/tmp").build());
-      mResponseObserver.onCompleted();
-      return null;
-    }).when(requestObserver).onNext(any(OpenLocalBlockRequest.class));
     mMockContext = PowerMockito.mock(FileSystemContext.class);
     PowerMockito.when(mMockContext.acquireBlockWorkerClient(Matchers.any(WorkerNetAddress.class)))
         .thenReturn(workerClient);

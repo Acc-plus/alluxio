@@ -12,8 +12,6 @@
 package alluxio.master.job;
 
 import alluxio.Constants;
-import alluxio.client.file.FileSystem;
-import alluxio.client.file.FileSystemContext;
 import alluxio.clock.SystemClock;
 import alluxio.collections.IndexDefinition;
 import alluxio.collections.IndexedSet;
@@ -30,7 +28,6 @@ import alluxio.heartbeat.HeartbeatContext;
 import alluxio.heartbeat.HeartbeatExecutor;
 import alluxio.heartbeat.HeartbeatThread;
 import alluxio.job.JobConfig;
-import alluxio.job.JobServerContext;
 import alluxio.job.meta.JobIdGenerator;
 import alluxio.job.meta.JobInfo;
 import alluxio.job.meta.MasterWorkerInfo;
@@ -75,7 +72,7 @@ import javax.annotation.concurrent.ThreadSafe;
 public final class JobMaster extends AbstractMaster implements NoopJournaled {
   private static final Logger LOG = LoggerFactory.getLogger(JobMaster.class);
   private static final long RETENTION_MS =
-      ServerConfiguration.getMs(PropertyKey.JOB_MASTER_FINISHED_JOB_RETENTION_TIME);
+      ServerConfiguration.getLong(PropertyKey.JOB_MASTER_FINISHED_JOB_RETENTION_MS);
 
   // Worker metadata management.
   private final IndexDefinition<MasterWorkerInfo, Long> mIdIndex =
@@ -93,11 +90,6 @@ public final class JobMaster extends AbstractMaster implements NoopJournaled {
           return o.getWorkerAddress();
         }
       };
-
-  /**
-   * The Filesystem context that the job master uses for its client.
-   */
-  private final JobServerContext mJobServerContext;
 
   /**
    * The total number of jobs that the JobMaster may run at any moment.
@@ -143,22 +135,24 @@ public final class JobMaster extends AbstractMaster implements NoopJournaled {
   private final SortedSet<JobInfo> mFinishedJobs;
 
   /**
+   * The manager for all ufs.
+   */
+  private UfsManager mUfsManager;
+
+  /**
    * Creates a new instance of {@link JobMaster}.
    *
    * @param masterContext the context for Alluxio master
-   * @param filesystem the Alluxio filesystem client the job master uses to communicate
-   * @param fsContext the filesystem client's underlying context
    * @param ufsManager the ufs manager
    */
-  public JobMaster(MasterContext masterContext, FileSystem filesystem,
-      FileSystemContext fsContext, UfsManager ufsManager) {
+  public JobMaster(MasterContext masterContext, UfsManager ufsManager) {
     super(masterContext, new SystemClock(),
         ExecutorServiceFactories.cachedThreadPool(Constants.JOB_MASTER_NAME));
-    mJobServerContext = new JobServerContext(filesystem, fsContext, ufsManager);
     mJobIdGenerator = new JobIdGenerator();
     mCommandManager = new CommandManager();
     mIdToJobCoordinator = new ConcurrentHashMap<>();
     mFinishedJobs = new ConcurrentSkipListSet<>();
+    mUfsManager = ufsManager;
   }
 
   @Override
@@ -174,7 +168,7 @@ public final class JobMaster extends AbstractMaster implements NoopJournaled {
       getExecutorService()
           .submit(new HeartbeatThread(HeartbeatContext.JOB_MASTER_LOST_WORKER_DETECTION,
               new LostWorkerDetectionHeartbeatExecutor(),
-              (int) ServerConfiguration.getMs(PropertyKey.JOB_MASTER_LOST_WORKER_INTERVAL),
+              ServerConfiguration.getInt(PropertyKey.JOB_MASTER_LOST_WORKER_INTERVAL_MS),
               ServerConfiguration.global()));
     }
   }
@@ -233,9 +227,8 @@ public final class JobMaster extends AbstractMaster implements NoopJournaled {
       }
     }
     long jobId = mJobIdGenerator.getNewJobId();
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
-        getWorkerInfoList(), jobId, jobConfig,
-        (jobInfo) -> {
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
+        getWorkerInfoList(), jobId, jobConfig, (jobInfo) -> {
           Status status = jobInfo.getStatus();
           mFinishedJobs.remove(jobInfo);
           if (status.isFinished()) {
@@ -376,8 +369,8 @@ public final class JobMaster extends AbstractMaster implements NoopJournaled {
 
     @Override
     public void heartbeat() {
-      int masterWorkerTimeoutMs = (int) ServerConfiguration
-          .getMs(PropertyKey.JOB_MASTER_WORKER_TIMEOUT);
+      int masterWorkerTimeoutMs = ServerConfiguration
+          .getInt(PropertyKey.JOB_MASTER_WORKER_TIMEOUT_MS);
       List<MasterWorkerInfo> lostWorkers = new ArrayList<MasterWorkerInfo>();
       // Run under shared lock for mWorkers
       try (LockResource workersLockShared = new LockResource(mWorkerRWLock.readLock())) {

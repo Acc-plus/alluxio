@@ -1,5 +1,5 @@
 ```properties
-alluxio.master.mount.table.root.ufs=s3a://<bucket>/<folder>
+alluxio.underfs.address=s3a://<bucket>/<folder>
 aws.accessKeyId=<access-key>
 aws.secretKey=<secret-key>
 alluxio.underfs.s3.endpoint=http://<rgw-hostname>:<rgw-port>

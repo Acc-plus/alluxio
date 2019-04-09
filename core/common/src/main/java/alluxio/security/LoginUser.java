@@ -127,7 +127,6 @@ public final class LoginUser {
    * @param subject the {@link Subject} to use
    * @param classLoader the {@link ClassLoader} to use
    * @param configuration the {@link javax.security.auth.login.Configuration} to use
-   * @param alluxioConf Alluxio configuration
    * @return the new {@link LoginContext} instance
    * @throws LoginException if LoginContext cannot be created
    */

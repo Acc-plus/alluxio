@@ -11,9 +11,7 @@
 
 package alluxio.util.io;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
@@ -37,7 +35,7 @@ public final class BufferUtilsTest {
       buf.put(i);
     }
     ByteBuffer bufClone = BufferUtils.cloneByteBuffer(buf);
-    assertEquals(buf, bufClone);
+    Assert.assertEquals(buf, bufClone);
   }
 
   /**
@@ -56,9 +54,9 @@ public final class BufferUtilsTest {
       bufList.add(buf);
     }
     List<ByteBuffer> bufListClone = BufferUtils.cloneByteBufferList(bufList);
-    assertEquals(listLength, bufListClone.size());
+    Assert.assertEquals(listLength, bufListClone.size());
     for (int k = 0; k < listLength; k++) {
-      assertEquals(bufList.get(k), bufListClone.get(k));
+      Assert.assertEquals(bufList.get(k), bufListClone.get(k));
     }
   }
 
@@ -74,7 +72,7 @@ public final class BufferUtilsTest {
       bufDirect.put(i);
     }
     ByteBuffer bufClone = BufferUtils.cloneByteBuffer(bufDirect);
-    assertEquals(bufDirect, bufClone);
+    Assert.assertEquals(bufDirect, bufClone);
   }
 
   /**
@@ -94,9 +92,9 @@ public final class BufferUtilsTest {
       bufDirectList.add(bufDirect);
     }
     List<ByteBuffer> bufListClone = BufferUtils.cloneByteBufferList(bufDirectList);
-    assertEquals(listLength, bufListClone.size());
+    Assert.assertEquals(listLength, bufListClone.size());
     for (int k = 0; k < listLength; k++) {
-      assertEquals(bufDirectList.get(k), bufListClone.get(k));
+      Assert.assertEquals(bufDirectList.get(k), bufListClone.get(k));
     }
   }
 
@@ -125,7 +123,7 @@ public final class BufferUtilsTest {
     for (TestCase testCase : testCases) {
       ByteBuffer buf = ByteBuffer.allocate(1);
       BufferUtils.putIntByteBuffer(buf, testCase.mInput);
-      assertEquals(testCase.mExpected, buf.get(0));
+      Assert.assertEquals(testCase.mExpected, buf.get(0));
     }
   }
 
@@ -156,9 +154,9 @@ public final class BufferUtilsTest {
 
     for (TestCase testCase : testCases) {
       byte[] result = BufferUtils.getIncreasingByteArray(testCase.mStart, testCase.mLength);
-      assertEquals(testCase.mExpected.length, result.length);
+      Assert.assertEquals(testCase.mExpected.length, result.length);
       for (int k = 0; k < result.length; k++) {
-        assertEquals(testCase.mExpected[k], result[k]);
+        Assert.assertEquals(testCase.mExpected[k], result[k]);
       }
     }
   }
@@ -202,7 +200,7 @@ public final class BufferUtilsTest {
     for (TestCase testCase : testCases) {
       boolean result = BufferUtils.equalIncreasingByteArray(testCase.mStart, testCase.mLength,
           testCase.mArray);
-      assertEquals(testCase.mExpected, result);
+      Assert.assertEquals(testCase.mExpected, result);
     }
   }
 
@@ -233,9 +231,9 @@ public final class BufferUtilsTest {
 
     for (TestCase testCase : testCases) {
       ByteBuffer result = BufferUtils.getIncreasingByteBuffer(testCase.mStart, testCase.mLength);
-      assertEquals(testCase.mExpected.capacity(), result.capacity());
+      Assert.assertEquals(testCase.mExpected.capacity(), result.capacity());
       for (int k = 0; k < result.capacity(); k++) {
-        assertEquals(testCase.mExpected.get(k), result.get(k));
+        Assert.assertEquals(testCase.mExpected.get(k), result.get(k));
       }
     }
   }
@@ -279,7 +277,7 @@ public final class BufferUtilsTest {
     for (TestCase testCase : testCases) {
       boolean result = BufferUtils.equalIncreasingByteBuffer(testCase.mStart, testCase.mLength,
           testCase.mBuffer);
-      assertEquals(testCase.mExpected, result);
+      Assert.assertEquals(testCase.mExpected, result);
     }
   }
 
@@ -303,7 +301,7 @@ public final class BufferUtilsTest {
         BufferUtils.cleanDirectBuffer(buf);
       }
     } catch (OutOfMemoryError ooe) {
-      fail("cleanDirectBuffer is causing memory leak." + ooe.getMessage());
+      Assert.fail("cleanDirectBuffer is causing memory leak." + ooe.getMessage());
     }
   }
 
@@ -318,22 +316,22 @@ public final class BufferUtilsTest {
     for (int slicePosition : new int[] {0, 1, size / 2, size - 1}) {
       // Slice a ByteBuffer of length 1
       ByteBuffer slicedBuffer = BufferUtils.sliceByteBuffer(buf, slicePosition, 1);
-      assertEquals(0, slicedBuffer.position());
-      assertEquals(1, slicedBuffer.limit());
-      assertTrue(BufferUtils.equalIncreasingByteBuffer(slicePosition, 1, slicedBuffer));
+      Assert.assertEquals(0, slicedBuffer.position());
+      Assert.assertEquals(1, slicedBuffer.limit());
+      Assert.assertTrue(BufferUtils.equalIncreasingByteBuffer(slicePosition, 1, slicedBuffer));
 
       // Slice a ByteBuffer from the target position to the end
       int slicedBufferLength = size - slicePosition;
       ByteBuffer slicedBuffer1 = BufferUtils.sliceByteBuffer(buf, slicePosition,
           slicedBufferLength);
       ByteBuffer slicedBuffer2 = BufferUtils.sliceByteBuffer(buf, slicePosition);
-      assertEquals(0, slicedBuffer1.position());
-      assertEquals(0, slicedBuffer2.position());
-      assertEquals(slicedBufferLength, slicedBuffer1.limit());
-      assertEquals(slicedBufferLength, slicedBuffer2.limit());
-      assertTrue(BufferUtils.equalIncreasingByteBuffer(slicePosition, slicedBufferLength,
+      Assert.assertEquals(0, slicedBuffer1.position());
+      Assert.assertEquals(0, slicedBuffer2.position());
+      Assert.assertEquals(slicedBufferLength, slicedBuffer1.limit());
+      Assert.assertEquals(slicedBufferLength, slicedBuffer2.limit());
+      Assert.assertTrue(BufferUtils.equalIncreasingByteBuffer(slicePosition, slicedBufferLength,
           slicedBuffer1));
-      assertTrue(BufferUtils.equalIncreasingByteBuffer(slicePosition, slicedBufferLength,
+      Assert.assertTrue(BufferUtils.equalIncreasingByteBuffer(slicePosition, slicedBufferLength,
           slicedBuffer2));
     }
   }

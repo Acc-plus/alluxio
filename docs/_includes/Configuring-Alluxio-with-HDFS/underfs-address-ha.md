@@ -1,3 +1,3 @@
 ```properties
-alluxio.master.mount.table.root.ufs=hdfs://nameservice/
+alluxio.underfs.address=hdfs://nameservice/
 ```

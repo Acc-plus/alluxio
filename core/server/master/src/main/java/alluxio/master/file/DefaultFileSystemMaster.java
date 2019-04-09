@@ -99,12 +99,11 @@ import alluxio.master.file.meta.UfsBlockLocationCache;
 import alluxio.master.file.meta.UfsSyncPathCache;
 import alluxio.master.file.meta.UfsSyncUtils;
 import alluxio.master.file.meta.options.MountInfo;
+import alluxio.master.journal.CheckpointName;
 import alluxio.master.journal.JournalContext;
 import alluxio.master.journal.JournalEntryIterable;
 import alluxio.master.journal.JournalUtils;
 import alluxio.master.journal.Journaled;
-import alluxio.master.journal.checkpoint.CheckpointInputStream;
-import alluxio.master.journal.checkpoint.CheckpointName;
 import alluxio.master.metastore.DelegatingReadOnlyInodeStore;
 import alluxio.master.metastore.InodeStore;
 import alluxio.master.metastore.InodeStore.InodeStoreArgs;
@@ -187,6 +186,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -436,15 +436,8 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
     mTimeSeriesStore = new TimeSeriesStore();
     // The mount table should come after the inode tree because restoring the mount table requires
     // that the inode tree is already restored.
-    mJournaledComponents = new ArrayList<Journaled>() {
-      {
-        add(mInodeTree);
-        add(mDirectoryIdGenerator);
-        add(mMountTable);
-        add(mUfsManager);
-        add(mSyncManager);
-      }
-    };
+    mJournaledComponents =
+        Arrays.asList(mInodeTree, mDirectoryIdGenerator, mMountTable, mUfsManager, mSyncManager);
 
     resetState();
     Metrics.registerGauges(this, mUfsManager);
@@ -513,7 +506,7 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
   }
 
   @Override
-  public void restoreFromCheckpoint(CheckpointInputStream input) throws IOException {
+  public void restoreFromCheckpoint(InputStream input) throws IOException {
     JournalUtils.restoreFromCheckpoint(input, mJournaledComponents);
   }
 
@@ -2389,27 +2382,44 @@ public final class DefaultFileSystemMaster extends CoreMaster implements FileSys
     return new ArrayList<>(lostFiles);
   }
 
+  @Override
+  public long loadMetadata(AlluxioURI path, LoadMetadataContext context)
+      throws BlockInfoException, FileDoesNotExistException, InvalidPathException,
+      InvalidFileSizeException, FileAlreadyCompletedException, IOException, AccessControlException {
+    try (RpcContext rpcContext = createRpcContext();
+         LockedInodePath inodePath = mInodeTree.lockInodePath(path, LockPattern.READ);
+         FileSystemMasterAuditContext auditContext =
+             createAuditContext("loadMetadata", path, null, inodePath.getParentInodeOrNull())) {
+      if (context.getOptions().getCreateAncestors()) {
+        auditContext.setSrcInode(inodePath.getLastExistingInode());
+      }
+      try {
+        mPermissionChecker.checkParentPermission(Mode.Bits.WRITE, inodePath);
+      } catch (AccessControlException e) {
+        auditContext.setAllowed(false);
+        throw e;
+      }
+      loadMetadataInternal(rpcContext, inodePath, context);
+      // Re-traverse to pick up loaded inodes.
+      inodePath.traverse();
+      auditContext.setSrcInode(inodePath.getInode()).setSucceeded(true);
+      return inodePath.getInode().getId();
+    }
+  }
+
   /**
    * Loads metadata for the object identified by the given path from UFS into Alluxio.
    *
-   * This operation requires users to have WRITE permission on the path
-   * and its parent path if path is a file, or WRITE permission on the
-   * parent path if path is a directory.
+   * If the object is loaded, the inode path will
    *
    * @param rpcContext the rpc context
    * @param inodePath the path for which metadata should be loaded
    * @param context the load metadata context
-   * @throws AccessControlException if permission checking fails
-   * @throws BlockInfoException if an invalid block size is encountered
-   * @throws FileAlreadyCompletedException if the file is already completed
-   * @throws FileDoesNotExistException if there is no UFS path
-   * @throws InvalidFileSizeException if invalid file size is encountered
-   * @throws InvalidPathException if invalid path is encountered
    */
   private void loadMetadataInternal(RpcContext rpcContext, LockedInodePath inodePath,
       LoadMetadataContext context)
-      throws AccessControlException, BlockInfoException, FileAlreadyCompletedException,
-      FileDoesNotExistException, InvalidFileSizeException, InvalidPathException, IOException {
+      throws InvalidPathException, FileDoesNotExistException, BlockInfoException,
+      FileAlreadyCompletedException, InvalidFileSizeException, AccessControlException, IOException {
     AlluxioURI path = inodePath.getUri();
     MountTable.Resolution resolution = mMountTable.resolve(path);
     AlluxioURI ufsUri = resolution.getUri();

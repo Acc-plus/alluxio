@@ -12,26 +12,12 @@
 package alluxio.master.file.meta;
 
 import alluxio.Constants;
-import alluxio.master.journal.checkpoint.CheckpointInputStream;
-import alluxio.master.journal.checkpoint.CheckpointName;
-import alluxio.master.journal.checkpoint.CheckpointOutputStream;
-import alluxio.master.journal.checkpoint.CheckpointType;
-import alluxio.master.journal.checkpoint.Checkpointed;
-import alluxio.master.metastore.ReadOnlyInodeStore;
 
-import com.google.common.base.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.annotation.Nullable;
 
 /**
  * A list of non-empty {@link TtlBucket}s sorted by ttl interval start time of each bucket.
@@ -40,23 +26,17 @@ import javax.annotation.concurrent.ThreadSafe;
  * in the skipped intervals.
  */
 @ThreadSafe
-public final class TtlBucketList implements Checkpointed {
-  private static final Logger LOG = LoggerFactory.getLogger(TtlBucketList.class);
-
+public final class TtlBucketList {
   /**
    * List of buckets sorted by interval start time. SkipList is used for O(logn) insertion and
    * retrieval, see {@link ConcurrentSkipListSet}.
    */
   private final ConcurrentSkipListSet<TtlBucket> mBucketList;
-  private final ReadOnlyInodeStore mInodeStore;
 
   /**
    * Creates a new list of {@link TtlBucket}s.
-   *
-   * @param inodeStore the inode store
    */
-  public TtlBucketList(ReadOnlyInodeStore inodeStore) {
-    mInodeStore = inodeStore;
+  public TtlBucketList() {
     mBucketList = new ConcurrentSkipListSet<>();
   }
 
@@ -164,40 +144,5 @@ public final class TtlBucketList implements Checkpointed {
    */
   public void removeBuckets(Set<TtlBucket> buckets) {
     mBucketList.removeAll(buckets);
-  }
-
-  @Override
-  public CheckpointName getCheckpointName() {
-    return CheckpointName.TTL_BUCKET_LIST;
-  }
-
-  @Override
-  public void writeToCheckpoint(OutputStream output) throws IOException, InterruptedException {
-    CheckpointOutputStream cos = new CheckpointOutputStream(output, CheckpointType.LONGS);
-    for (TtlBucket bucket : mBucketList) {
-      for (Inode inode : bucket.getInodes()) {
-        cos.writeLong(inode.getId());
-      }
-    }
-  }
-
-  @Override
-  public void restoreFromCheckpoint(CheckpointInputStream input) throws IOException {
-    mBucketList.clear();
-    Preconditions.checkState(input.getType() == CheckpointType.LONGS,
-        "Unexpected checkpoint type: %s", input.getType());
-    while (true) {
-      try {
-        long id = input.readLong();
-        Optional<Inode> inode = mInodeStore.get(id);
-        if (inode.isPresent()) {
-          insert(inode.get());
-        } else {
-          LOG.error("Failed to find inode for id {}", id);
-        }
-      } catch (EOFException e) {
-        break;
-      }
-    }
   }
 }

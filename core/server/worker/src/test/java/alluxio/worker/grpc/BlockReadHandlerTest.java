@@ -20,7 +20,6 @@ import static org.mockito.Mockito.when;
 
 import alluxio.grpc.ReadRequest;
 import alluxio.grpc.ReadResponse;
-import alluxio.security.authentication.AuthenticatedUserInfo;
 import alluxio.worker.block.BlockWorker;
 import alluxio.worker.block.io.BlockReader;
 import alluxio.worker.block.io.LocalFileBlockReader;
@@ -59,9 +58,9 @@ public final class BlockReadHandlerTest extends ReadHandlerTest {
       return null;
     }).when(mResponseObserver).onNext(any(ReadResponse.class));
     mReadHandler = new BlockReadHandler(GrpcExecutors.BLOCK_READER_EXECUTOR, mBlockWorker,
-        mResponseObserver, new AuthenticatedUserInfo());
-    mReadHandlerNoException = new BlockReadHandler(GrpcExecutors.BLOCK_READER_EXECUTOR,
-        mBlockWorker, mResponseObserver, new AuthenticatedUserInfo());
+        mResponseObserver);
+    mReadHandlerNoException = new BlockReadHandler(
+        GrpcExecutors.BLOCK_READER_EXECUTOR, mBlockWorker, mResponseObserver);
   }
 
   /**

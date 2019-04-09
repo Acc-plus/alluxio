@@ -13,7 +13,6 @@ package alluxio.client.block.policy.options;
 
 import alluxio.annotation.PublicApi;
 import alluxio.client.block.BlockWorkerInfo;
-import alluxio.wire.BlockInfo;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
@@ -27,7 +26,9 @@ import java.util.List;
 @PublicApi
 public final class GetWorkerOptions {
   private List<BlockWorkerInfo> mBlockWorkerInfos;
-  private BlockInfo mBlockInfo;
+  // TODO(calvin): Replace with BlockInfo
+  private long mBlockId;
+  private long mBlockSize;
 
   /**
    * @return the default {@link GetWorkerOptions}
@@ -39,16 +40,7 @@ public final class GetWorkerOptions {
   /**
    * Creates a new instance with defaults.
    */
-  private GetWorkerOptions() {
-    mBlockInfo = new BlockInfo();
-  }
-
-  /**
-   * @return the list of block worker infos
-   */
-  public BlockInfo getBlockInfo() {
-    return mBlockInfo;
-  }
+  private GetWorkerOptions() {}
 
   /**
    * @return the list of block worker infos
@@ -58,12 +50,17 @@ public final class GetWorkerOptions {
   }
 
   /**
-   * @param blockInfo the block information
-   * @return the updated options
+   * @return the block ID
    */
-  public GetWorkerOptions setBlockInfo(BlockInfo blockInfo) {
-    mBlockInfo = blockInfo;
-    return this;
+  public long getBlockId() {
+    return mBlockId;
+  }
+
+  /**
+   * @return the block size
+   */
+  public long getBlockSize() {
+    return mBlockSize;
   }
 
   /**
@@ -73,6 +70,24 @@ public final class GetWorkerOptions {
   public GetWorkerOptions setBlockWorkerInfos(
       List<BlockWorkerInfo> blockWorkerInfos) {
     mBlockWorkerInfos = blockWorkerInfos;
+    return this;
+  }
+
+  /**
+   * @param blockId the block ID to set
+   * @return the updated options
+   */
+  public GetWorkerOptions setBlockId(long blockId) {
+    mBlockId = blockId;
+    return this;
+  }
+
+  /**
+   * @param blockSize the block size
+   * @return the updated options
+   */
+  public GetWorkerOptions setBlockSize(long blockSize) {
+    mBlockSize = blockSize;
     return this;
   }
 
@@ -86,18 +101,20 @@ public final class GetWorkerOptions {
     }
     GetWorkerOptions that = (GetWorkerOptions) o;
     return Objects.equal(mBlockWorkerInfos, that.mBlockWorkerInfos)
-        && Objects.equal(mBlockInfo, that.mBlockInfo);
+        && Objects.equal(mBlockId, that.mBlockId)
+        && Objects.equal(mBlockSize, that.getBlockSize());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(mBlockWorkerInfos, mBlockInfo);
+    return Objects.hashCode(mBlockWorkerInfos, mBlockId, mBlockSize);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
-        .add("blockInfo", mBlockInfo)
+        .add("blockId", mBlockId)
+        .add("blockSize", mBlockSize)
         .add("blockWorkerInfos", mBlockWorkerInfos)
         .toString();
   }

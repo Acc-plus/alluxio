@@ -56,7 +56,10 @@ public final class PlainSaslServerCallbackHandlerTest {
   @Before
   public void before() throws Exception {
     mPlainServerCBHandler = new PlainSaslServerCallbackHandler(
-        AuthenticationProvider.Factory.create(AuthType.CUSTOM, mConfiguration), mConfiguration);
+        AuthenticationProvider.Factory.create(AuthType.CUSTOM, mConfiguration), new Runnable() {
+          @Override
+          public void run() {}
+        }, mConfiguration);
   }
 
   @After

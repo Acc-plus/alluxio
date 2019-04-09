@@ -16,7 +16,6 @@ import alluxio.conf.PropertyKey;
 import alluxio.exception.status.AlluxioStatusException;
 import alluxio.security.authentication.AuthType;
 import alluxio.security.authentication.ChannelAuthenticator;
-
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.netty.channel.EventLoopGroup;
@@ -34,9 +33,6 @@ public final class GrpcChannelBuilder {
   /** Key for acquiring the underlying managed channel. */
   protected GrpcManagedChannelPool.ChannelKey mChannelKey;
 
-  /** gRPC Server address. */
-  protected GrpcServerAddress mServerAddress;
-
   /** Whether to use mParentSubject as authentication user. */
   protected boolean mUseSubject;
   /** Subject for authentication. */
@@ -52,12 +48,11 @@ public final class GrpcChannelBuilder {
 
   protected AlluxioConfiguration mConfiguration;
 
-  private GrpcChannelBuilder(GrpcServerAddress address, AlluxioConfiguration conf) {
-    mServerAddress = address;
+  private GrpcChannelBuilder(SocketAddress address, AlluxioConfiguration conf) {
     mConfiguration = conf;
     mChannelKey = GrpcManagedChannelPool.ChannelKey.create(conf);
     // Set default overrides for the channel.
-    mChannelKey.setAddress(address.getSocketAddress());
+    mChannelKey.setAddress(address).usePlaintext();
     mChannelKey.setMaxInboundMessageSize(
         (int) mConfiguration.getBytes(PropertyKey.USER_NETWORK_MAX_INBOUND_MESSAGE_SIZE));
     mUseSubject = true;
@@ -71,8 +66,7 @@ public final class GrpcChannelBuilder {
    * @param conf Alluxio configuration
    * @return a new instance of {@link GrpcChannelBuilder}
    */
-  public static GrpcChannelBuilder newBuilder(GrpcServerAddress address,
-      AlluxioConfiguration conf) {
+  public static GrpcChannelBuilder newBuilder(SocketAddress address, AlluxioConfiguration conf) {
     return new GrpcChannelBuilder(address, conf);
   }
 
@@ -219,7 +213,7 @@ public final class GrpcChannelBuilder {
                   mConfiguration.getMs(PropertyKey.MASTER_GRPC_CHANNEL_AUTH_TIMEOUT));
         }
         // Get an authenticated wrapper channel over given managed channel.
-        clientChannel = channelAuthenticator.authenticate(mServerAddress, underlyingChannel);
+        clientChannel = channelAuthenticator.authenticate(underlyingChannel, mConfiguration);
       }
       // Create the channel after authentication with the target.
       return new GrpcChannel(mChannelKey, clientChannel,

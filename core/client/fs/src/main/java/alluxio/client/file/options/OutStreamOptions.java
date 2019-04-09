@@ -11,7 +11,6 @@
 
 package alluxio.client.file.options;
 
-import alluxio.client.block.policy.BlockLocationPolicy;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.Constants;
 import alluxio.conf.PropertyKey;
@@ -19,10 +18,12 @@ import alluxio.annotation.PublicApi;
 import alluxio.client.AlluxioStorageType;
 import alluxio.client.UnderStorageType;
 import alluxio.client.WriteType;
+import alluxio.client.file.policy.FileWriteLocationPolicy;
 import alluxio.grpc.CreateFilePOptions;
 import alluxio.grpc.TtlAction;
 import alluxio.security.authorization.AccessControlList;
 import alluxio.security.authorization.Mode;
+import alluxio.util.CommonUtils;
 import alluxio.util.IdUtils;
 import alluxio.util.ModeUtils;
 import alluxio.util.SecurityUtils;
@@ -41,7 +42,7 @@ public final class OutStreamOptions {
   private long mBlockSizeBytes;
   private long mTtl;
   private TtlAction mTtlAction;
-  private BlockLocationPolicy mLocationPolicy;
+  private FileWriteLocationPolicy mLocationPolicy;
   private int mWriteTier;
   private WriteType mWriteType;
   private String mOwner;
@@ -67,7 +68,7 @@ public final class OutStreamOptions {
    *
    * @param options CreateFile options
    * @param alluxioConf Alluxio configuration
-   * @throws Exception if {@link BlockLocationPolicy} can't be loaded
+   * @throws Exception if FileWriteLocationPolicy can't be loaded
    */
   public OutStreamOptions(CreateFilePOptions options, AlluxioConfiguration alluxioConf) {
     this(alluxioConf);
@@ -92,11 +93,15 @@ public final class OutStreamOptions {
     if (options.hasWriteType()) {
       mWriteType = WriteType.fromProto(options.getWriteType());
     }
-    try {
-      mLocationPolicy = BlockLocationPolicy.Factory.create(
-          alluxioConf.get(PropertyKey.USER_BLOCK_WRITE_LOCATION_POLICY), alluxioConf);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    if (options.hasFileWriteLocationPolicy()) {
+      try {
+        mLocationPolicy = (FileWriteLocationPolicy) CommonUtils.createNewClassInstance(
+            Class.forName(options.getFileWriteLocationPolicy()),
+            new Class[] {AlluxioConfiguration.class},
+            new Object[] {alluxioConf});
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -104,9 +109,11 @@ public final class OutStreamOptions {
     mBlockSizeBytes = alluxioConf.getBytes(PropertyKey.USER_BLOCK_SIZE_BYTES_DEFAULT);
     mTtl = Constants.NO_TTL;
     mTtlAction = TtlAction.DELETE;
-    mLocationPolicy = BlockLocationPolicy.Factory.create(
-        alluxioConf.get(PropertyKey.USER_BLOCK_WRITE_LOCATION_POLICY),
-        alluxioConf);
+
+    mLocationPolicy =
+        CommonUtils.createNewClassInstance(alluxioConf.<FileWriteLocationPolicy>getClass(
+            PropertyKey.USER_FILE_WRITE_LOCATION_POLICY), new Class[] {AlluxioConfiguration.class},
+            new Object[] {alluxioConf});
     mWriteTier = alluxioConf.getInt(PropertyKey.USER_FILE_WRITE_TIER_DEFAULT);
     mWriteType = alluxioConf.getEnum(PropertyKey.USER_FILE_WRITE_TYPE_DEFAULT, WriteType.class);
     mOwner = SecurityUtils.getOwnerFromLoginModule(alluxioConf);
@@ -136,7 +143,7 @@ public final class OutStreamOptions {
   /**
    * @return the file write location policy
    */
-  public BlockLocationPolicy getLocationPolicy() {
+  public FileWriteLocationPolicy getLocationPolicy() {
     return mLocationPolicy;
   }
 
@@ -287,7 +294,7 @@ public final class OutStreamOptions {
    * @param locationPolicy the file write location policy
    * @return the updated options object
    */
-  public OutStreamOptions setLocationPolicy(BlockLocationPolicy locationPolicy) {
+  public OutStreamOptions setLocationPolicy(FileWriteLocationPolicy locationPolicy) {
     mLocationPolicy = locationPolicy;
     return this;
   }

@@ -20,7 +20,7 @@ OBS底层存储系统可作为扩展实现。预编译的OBS底层存储jar包�
 然后在master节点上执行以下命令在`conf/masters`和`conf/workers`中定义的所有master节点和worker节点上安装扩展版本：
 
 ```bash
-./bin/alluxio extensions install /PATH/TO/DOWNLOADED/OBS/jar
+$ bin/alluxio extensions install /PATH/TO/DOWNLOADED/OBS/jar
 ```
 
 了解更多Alluxio扩展管理信息请参考[这里](UFSExtensions.html) 
@@ -37,7 +37,7 @@ Alluxio通过[统一命名空间](Unified-and-Transparent-Namespace.html)统一�
 若要在Alluxio中使用OBS作为底层文件系统，需要修改`conf/alluxio-site.properties`配置文件。首先要指定一个已有的OBS bucket和其中的目录作为底层文件系统，可以在`conf/alluxio-site.properties`中添加如下语句指定它：
 
 ```
-alluxio.master.mount.table.root.ufs=obs://<OBS_BUCKET>/<OBS_DIRECTORY>/
+alluxio.underfs.address=obs://<OBS_BUCKET>/<OBS_DIRECTORY>/
 ```
 
 接着，需要制定华为云证书以便访问OBS，在`conf/alluxio-site.properties`中添加：
@@ -57,7 +57,7 @@ fs.obs.endpoint=<OBS_ENDPOINT>
 OBS可以安装在Alluxio命名空间中的嵌套目录中，以统一访问多个存储系统。[Mount 命令](Command-Line-Interface.html#mount)可以实现这一目的。例如，下面的命令将OBS容器内部的目录挂载到Alluxio的`/obs`目录：
 
 ```bash
-./bin/alluxio fs mount --option fs.obs.accessKey=<OBS_ACCESS_KEY> \
+$ ./bin/alluxio fs mount --option fs.obs.accessKey=<OBS_ACCESS_KEY> \
   --option fs.obs.secretKey=<OBS_SECRET_KEY> \
   --option fs.obs.endpoint=<OBS_ENDPOINT> \
   /obs obs://<OBS_BUCKET>/<OBS_DIRECTORY>/
@@ -68,8 +68,8 @@ OBS可以安装在Alluxio命名空间中的嵌套目录中，以统一访问多�
 配置完成后，你可以在本地启动Alluxio，观察一切是否正常运行：
 
 ```bash
-./bin/alluxio format
-./bin/alluxio-start.sh local
+$ bin/alluxio format
+$ bin/alluxio-start.sh local
 ```
 
 该命令应当会启动一个Alluxio master和一个Alluxio worker，可以在浏览器中访问[http://localhost:19999](http://localhost:19999)查看master UI。
@@ -77,7 +77,7 @@ OBS可以安装在Alluxio命名空间中的嵌套目录中，以统一访问多�
 接着，你可以运行一个简单的示例程序：
 
 ```bash
-./bin/alluxio runTests
+$ bin/alluxio runTests
 ```
 
 运行成功后，访问你的OBS目录`obs://<OBS_BUCKET>/<OBS_DIRECTORY>`，确认其中包含了由Alluxio创建的文件和目录。
@@ -85,5 +85,5 @@ OBS可以安装在Alluxio命名空间中的嵌套目录中，以统一访问多�
 运行以下命令停止Alluxio：
 
 ```bash
-./bin/alluxio-stop.sh local
+$ bin/alluxio-stop.sh local
 ```

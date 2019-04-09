@@ -19,7 +19,6 @@ import alluxio.exception.InvalidWorkerStateException;
 import alluxio.grpc.CreateLocalBlockRequest;
 import alluxio.grpc.CreateLocalBlockResponse;
 import alluxio.grpc.GrpcExceptionUtils;
-import alluxio.security.authentication.AuthenticatedUserInfo;
 import alluxio.util.IdUtils;
 import alluxio.util.LogUtils;
 import alluxio.worker.block.BlockWorker;
@@ -53,19 +52,15 @@ class ShortCircuitBlockWriteHandler implements StreamObserver<CreateLocalBlockRe
 
   private long mSessionId = INVALID_SESSION_ID;
 
-  private AuthenticatedUserInfo mUserInfo;
-
   /**
    * Creates an instance of {@link ShortCircuitBlockWriteHandler}.
    *
    * @param blockWorker the block worker
-   * @param userInfo the authenticated user info
    */
   ShortCircuitBlockWriteHandler(BlockWorker blockWorker,
-      StreamObserver<CreateLocalBlockResponse> responseObserver, AuthenticatedUserInfo userInfo) {
+      StreamObserver<CreateLocalBlockResponse> responseObserver) {
     mBlockWorker = blockWorker;
     mResponseObserver = responseObserver;
-    mUserInfo = userInfo;
   }
 
   /**

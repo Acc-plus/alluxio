@@ -20,7 +20,6 @@ import alluxio.exception.InvalidWorkerStateException;
 import alluxio.grpc.GrpcExceptionUtils;
 import alluxio.grpc.OpenLocalBlockRequest;
 import alluxio.grpc.OpenLocalBlockResponse;
-import alluxio.security.authentication.AuthenticatedUserInfo;
 import alluxio.util.IdUtils;
 import alluxio.util.LogUtils;
 import alluxio.worker.block.BlockLockManager;
@@ -49,20 +48,17 @@ class ShortCircuitBlockReadHandler implements StreamObserver<OpenLocalBlockReque
   /** The lock Id of the block being read. */
   private long mLockId;
   private long mSessionId;
-  private AuthenticatedUserInfo mUserInfo;
 
   /**
    * Creates an instance of {@link ShortCircuitBlockReadHandler}.
    *
    * @param blockWorker the block worker
-   * @param userInfo the authenticated user info
    */
   ShortCircuitBlockReadHandler(BlockWorker blockWorker,
-      StreamObserver<OpenLocalBlockResponse> responseObserver, AuthenticatedUserInfo userInfo) {
+      StreamObserver<OpenLocalBlockResponse> responseObserver) {
     mWorker = blockWorker;
     mLockId = BlockLockManager.INVALID_LOCK_ID;
     mResponseObserver = responseObserver;
-    mUserInfo = userInfo;
   }
 
   /**

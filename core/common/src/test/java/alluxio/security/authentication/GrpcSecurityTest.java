@@ -16,7 +16,6 @@ import alluxio.conf.PropertyKey;
 import alluxio.exception.status.UnauthenticatedException;
 import alluxio.grpc.GrpcChannelBuilder;
 import alluxio.grpc.GrpcServer;
-import alluxio.grpc.GrpcServerAddress;
 import alluxio.grpc.GrpcServerBuilder;
 import alluxio.util.ConfigurationUtils;
 import alluxio.util.network.NetworkAddressUtils;
@@ -126,19 +125,18 @@ public class GrpcSecurityTest {
     server.shutdown();
   }
 
-  private GrpcServerAddress getServerConnectAddress(GrpcServer server) {
-    return new GrpcServerAddress(new InetSocketAddress(
-        NetworkAddressUtils.getLocalHostName(
-            (int) mConfiguration.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS)),
-        server.getBindPort()));
+  private InetSocketAddress getServerConnectAddress(GrpcServer server) {
+    return new InetSocketAddress(NetworkAddressUtils
+        .getLocalHostName((int) mConfiguration
+            .getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS)), server.getBindPort());
   }
 
   private GrpcServer createServer(AuthType authType) {
     mConfiguration.set(PropertyKey.SECURITY_AUTHENTICATION_TYPE, authType.name());
-    InetSocketAddress bindAddress = new InetSocketAddress(NetworkAddressUtils.getLocalHostName(
-        (int) mConfiguration.getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS)), 0);
-    GrpcServerBuilder serverBuilder =
-        GrpcServerBuilder.forAddress("localhost", bindAddress, mConfiguration);
+    GrpcServerBuilder serverBuilder = GrpcServerBuilder
+        .forAddress(new InetSocketAddress(NetworkAddressUtils
+            .getLocalHostName((int) mConfiguration
+                .getMs(PropertyKey.NETWORK_HOST_RESOLUTION_TIMEOUT_MS)), 0), mConfiguration);
     return serverBuilder.build();
   }
 

@@ -11,6 +11,7 @@
 
 package alluxio.security.authentication;
 
+import alluxio.conf.AlluxioConfiguration;
 import alluxio.exception.status.UnauthenticatedException;
 import alluxio.grpc.SaslMessage;
 
@@ -21,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.util.UUID;
 
 import javax.security.sasl.SaslException;
+import javax.security.sasl.SaslServer;
 
 /**
  * Responsible for driving sasl traffic from server-side. Acts as a server's Sasl stream.
@@ -35,16 +37,20 @@ public class SaslStreamServerDriver implements StreamObserver<SaslMessage> {
   private AuthenticationServer mAuthenticationServer;
   /** Id for client-side channel that is authenticating. */
   private UUID mChannelId;
-  /** Sasl server handler that will be used for authentication. */
-  private SaslServerHandler mSaslServerHandler = null;
+  /** Sasl server that will be used for authentication. */
+  private SaslServer mSaslServer = null;
+  private final AlluxioConfiguration mConfiguration;
 
   /**
    * Creates {@link SaslStreamServerDriver} for given {@link AuthenticationServer}.
    *
    * @param authenticationServer authentication server
+   * @param conf Alluxio configuration
    */
-  public SaslStreamServerDriver(AuthenticationServer authenticationServer) {
+  public SaslStreamServerDriver(AuthenticationServer authenticationServer,
+      AlluxioConfiguration conf) {
     mAuthenticationServer = authenticationServer;
+    mConfiguration = conf;
   }
 
   /**
@@ -67,10 +73,15 @@ public class SaslStreamServerDriver implements StreamObserver<SaslMessage> {
         // ChannelId and the AuthenticationName will be set only in the first call.
         // Initialize this server driver accordingly.
         mChannelId = UUID.fromString(saslMessage.getClientId());
-        // Get authentication server to create the Sasl handler for requested scheme.
-        mSaslServerHandler =
-            mAuthenticationServer.createSaslHandler(saslMessage.getAuthenticationScheme());
-        mSaslHandshakeServerHandler = new DefaultSaslHandshakeServerHandler(mSaslServerHandler);
+        AuthType authType = AuthType.valueOf(saslMessage.getAuthenticationName());
+        LOG.debug("SaslServerDriver received authentication request. ChannelId: {}, AuthType: {}",
+            mChannelId, authType);
+        // TODO(ggezer) wire server name?
+        mSaslServer =
+            SaslParticipantProvider.Factory.create(authType).createSaslServer("localhost",
+                mConfiguration);
+        mSaslHandshakeServerHandler =
+            SaslHandshakeServerHandler.Factory.create(authType, mSaslServer);
         // Unregister from registry if in case it was authenticated before.
         mAuthenticationServer.unregisterChannel(mChannelId);
       }
@@ -88,8 +99,8 @@ public class SaslStreamServerDriver implements StreamObserver<SaslMessage> {
 
   @Override
   public void onCompleted() {
-    // Provide SaslServer handler with succeeded authentication information.
-    mSaslServerHandler.authenticationCompleted(mChannelId, mAuthenticationServer);
+    mAuthenticationServer.registerChannel(mChannelId, mSaslServer.getAuthorizationID(),
+        mSaslServer);
     mRequestObserver.onCompleted();
   }
 }

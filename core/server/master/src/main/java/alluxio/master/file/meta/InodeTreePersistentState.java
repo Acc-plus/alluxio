@@ -12,11 +12,10 @@
 package alluxio.master.file.meta;
 
 import alluxio.ProcessUtils;
+import alluxio.collections.ConcurrentHashSet;
+import alluxio.master.journal.CheckpointName;
 import alluxio.master.journal.JournalContext;
-import alluxio.master.journal.JournalUtils;
 import alluxio.master.journal.Journaled;
-import alluxio.master.journal.checkpoint.CheckpointInputStream;
-import alluxio.master.journal.checkpoint.CheckpointName;
 import alluxio.master.metastore.InodeStore;
 import alluxio.proto.journal.File.AsyncPersistRequestEntry;
 import alluxio.proto.journal.File.CompleteFileEntry;
@@ -46,20 +45,17 @@ import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /**
@@ -81,17 +77,24 @@ public class InodeTreePersistentState implements Journaled {
    *
    * This class owns this set, and no other class can modify the set.
    */
-  private final PinnedInodeFileIds mPinnedInodeFileIds = new PinnedInodeFileIds();
+  private final Set<Long> mPinnedInodeFileIds = new ConcurrentHashSet<>(64, 0.90f, 64);
 
   /** A set of inode ids whose replication max value is non-default. */
-  private final ReplicationLimitedFileIds mReplicationLimitedFileIds =
-      new ReplicationLimitedFileIds();
-
-  /** Counter for tracking how many inodes we have. */
-  private final InodeCounter mInodeCounter = new InodeCounter();
+  private final Set<Long> mReplicationLimitedFileIds = new ConcurrentHashSet<>(64, 0.90f, 64);
 
   /** A set of inode ids whose persistence state is {@link PersistenceState#TO_BE_PERSISTED}. */
-  private final ToBePersistedFileIds mToBePersistedIds = new ToBePersistedFileIds();
+  private final Set<Long> mToBePersistedIds = new ConcurrentHashSet<>(64, 0.90f, 64);
+
+  /** Counter for tracking how many inodes we have. */
+  private final AtomicLong mInodeCounter = new AtomicLong();
+
+  /**
+   * @return an unmodifiable view of the files with persistence state
+   *         {@link PersistenceState#TO_BE_PERSISTED}
+   */
+  public Set<Long> getToBePersistedIds() {
+    return Collections.unmodifiableSet(mToBePersistedIds);
+  }
 
   /**
    * TTL bucket list. The list is owned by InodeTree, and is only shared with
@@ -139,14 +142,6 @@ public class InodeTreePersistentState implements Journaled {
    */
   public long getInodeCount() {
     return mInodeCounter.get();
-  }
-
-  /**
-   * @return an unmodifiable view of the files with persistence state
-   *         {@link PersistenceState#TO_BE_PERSISTED}
-   */
-  public Set<Long> getToBePersistedIds() {
-    return Collections.unmodifiableSet(mToBePersistedIds);
   }
 
   /**
@@ -368,11 +363,7 @@ public class InodeTreePersistentState implements Journaled {
   }
 
   private void applyUpdateInode(UpdateInodeEntry entry) {
-    Optional<MutableInode<?>> inodeOpt = mInodeStore.getMutable(entry.getId());
-    if (!inodeOpt.isPresent()) {
-      throw new IllegalStateException("Inode " + entry.getId() + " not found");
-    }
-    MutableInode<?> inode = inodeOpt.get();
+    MutableInode<?> inode = mInodeStore.getMutable(entry.getId()).get();
     if (entry.hasTtl()) {
       // Remove before updating the inode. #remove relies on the inode having the same
       // TTL as when it was inserted.
@@ -416,8 +407,8 @@ public class InodeTreePersistentState implements Journaled {
 
   private void applyUpdateInodeFile(UpdateInodeFileEntry entry) {
     MutableInode<?> inode = mInodeStore.getMutable(entry.getId()).get();
-    Preconditions.checkState(inode.isFile(), "Encountered non-file id in update file entry %s",
-        entry);
+    Preconditions.checkState(inode.isFile(),
+        "Encountered non-file id in update file entry %s", entry);
     if (entry.hasReplicationMax()) {
       if (entry.getReplicationMax() == alluxio.Constants.REPLICATION_MAX_INFINITY) {
         mReplicationLimitedFileIds.remove(inode.getId());
@@ -434,28 +425,40 @@ public class InodeTreePersistentState implements Journaled {
   ////
 
   private void applyAsyncPersist(AsyncPersistRequestEntry entry) {
-    applyUpdateInode(UpdateInodeEntry.newBuilder().setId(entry.getFileId())
-        .setPersistenceState(PersistenceState.TO_BE_PERSISTED.name()).build());
+    applyUpdateInode(UpdateInodeEntry.newBuilder()
+        .setId(entry.getFileId())
+        .setPersistenceState(PersistenceState.TO_BE_PERSISTED.name())
+        .build());
   }
 
   private void applyCompleteFile(CompleteFileEntry entry) {
-    applyUpdateInode(UpdateInodeEntry.newBuilder().setId(entry.getId())
-        .setLastModificationTimeMs(entry.getOpTimeMs()).setOverwriteModificationTime(true)
-        .setUfsFingerprint(entry.getUfsFingerprint()).build());
-    applyUpdateInodeFile(UpdateInodeFileEntry.newBuilder().setId(entry.getId())
-        .setLength(entry.getLength()).addAllSetBlocks(entry.getBlockIdsList()).build());
+    applyUpdateInode(UpdateInodeEntry.newBuilder()
+        .setId(entry.getId())
+        .setLastModificationTimeMs(entry.getOpTimeMs())
+        .setOverwriteModificationTime(true)
+        .setUfsFingerprint(entry.getUfsFingerprint())
+        .build());
+    applyUpdateInodeFile(UpdateInodeFileEntry.newBuilder()
+        .setId(entry.getId())
+        .setLength(entry.getLength())
+        .addAllSetBlocks(entry.getBlockIdsList())
+        .build());
   }
 
   private void applyInodeLastModificationTime(InodeLastModificationTimeEntry entry) {
     // This entry is deprecated, use UpdateInode instead.
-    applyUpdateInode(UpdateInodeEntry.newBuilder().setId(entry.getId())
-        .setLastModificationTimeMs(entry.getLastModificationTimeMs()).build());
+    applyUpdateInode(UpdateInodeEntry.newBuilder()
+        .setId(entry.getId())
+        .setLastModificationTimeMs(entry.getLastModificationTimeMs())
+        .build());
   }
 
   private void applyPersistDirectory(PersistDirectoryEntry entry) {
     // This entry is deprecated, use UpdateInode instead.
-    applyUpdateInode(UpdateInodeEntry.newBuilder().setId(entry.getId())
-        .setPersistenceState(PersistenceState.PERSISTED.name()).build());
+    applyUpdateInode(UpdateInodeEntry.newBuilder()
+        .setId(entry.getId())
+        .setPersistenceState(PersistenceState.PERSISTED.name())
+        .build());
   }
 
   private void applySetAttribute(SetAttributeEntry entry) {
@@ -602,9 +605,12 @@ public class InodeTreePersistentState implements Journaled {
     Preconditions.checkState(!entry.hasNewParentId(),
         "old-style rename entries should not have the newParentId field set");
     Path path = Paths.get(entry.getDstPath());
-    return RenameEntry.newBuilder().setId(entry.getId())
-        .setNewParentId(getIdFromPath(path.getParent())).setNewName(path.getFileName().toString())
-        .setOpTimeMs(entry.getOpTimeMs()).build();
+    return RenameEntry.newBuilder()
+        .setId(entry.getId())
+        .setNewParentId(getIdFromPath(path.getParent()))
+        .setNewName(path.getFileName().toString())
+        .setOpTimeMs(entry.getOpTimeMs())
+        .build();
   }
 
   private long getIdFromPath(Path path) {
@@ -657,22 +663,6 @@ public class InodeTreePersistentState implements Journaled {
     mInodeStore.clear();
     mReplicationLimitedFileIds.clear();
     mPinnedInodeFileIds.clear();
-  }
-
-  @Override
-  public void writeToCheckpoint(OutputStream output) throws IOException, InterruptedException {
-    // mTtlBuckets must come after mInodeStore so that it can query the inode store to resolve inode
-    // ids to inodes.
-    JournalUtils.writeToCheckpoint(output, Arrays.asList(mInodeStore, mPinnedInodeFileIds,
-        mReplicationLimitedFileIds, mToBePersistedIds, mTtlBuckets, mInodeCounter));
-  }
-
-  @Override
-  public void restoreFromCheckpoint(CheckpointInputStream input) throws IOException {
-    // mTtlBuckets must come after mInodeStore so that it can query the inode store to resolve inode
-    // ids to inodes.
-    JournalUtils.restoreFromCheckpoint(input, Arrays.asList(mInodeStore, mPinnedInodeFileIds,
-        mReplicationLimitedFileIds, mToBePersistedIds, mTtlBuckets, mInodeCounter));
   }
 
   @Override

@@ -25,7 +25,6 @@ import alluxio.grpc.WriteRequestCommand;
 import alluxio.grpc.WriteResponse;
 import alluxio.network.protocol.databuffer.DataBuffer;
 import alluxio.network.protocol.databuffer.ByteArrayDataBuffer;
-import alluxio.security.authentication.AuthenticatedUserInfo;
 import alluxio.util.CommonUtils;
 import alluxio.util.WaitForOptions;
 import alluxio.util.io.BufferUtils;
@@ -58,7 +57,6 @@ public abstract class AbstractWriteHandlerTest {
   protected static final long TEST_MOUNT_ID = 10L;
   protected AbstractWriteHandler mWriteHandler;
   protected StreamObserver<WriteResponse> mResponseObserver;
-  protected AuthenticatedUserInfo mUserInfo = new AuthenticatedUserInfo();
   protected List<WriteResponse> mResponses = new ArrayList<>();
   protected boolean mResponseCompleted;
   protected Throwable mError;

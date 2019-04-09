@@ -17,7 +17,6 @@ import alluxio.ConfigurationRule;
 import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.grpc.FileSystemMasterClientServiceGrpc;
-import alluxio.grpc.GrpcServerAddress;
 import alluxio.grpc.ListStatusPRequest;
 import alluxio.multi.process.MasterNetAddress;
 import alluxio.multi.process.MultiProcessCluster;
@@ -108,7 +107,8 @@ public class ZookeeperFailureIntegrationTest extends BaseIntegrationTest {
         new InetSocketAddress(netAddress.getHostname(), netAddress.getRpcPort());
     try {
       GrpcChannel channel = GrpcChannelBuilder
-          .newBuilder(new GrpcServerAddress(address), ServerConfiguration.global()).build();
+              .newBuilder(address, ServerConfiguration.global())
+              .build();
       FileSystemMasterClientServiceGrpc.FileSystemMasterClientServiceBlockingStub client =
           FileSystemMasterClientServiceGrpc.newBlockingStub(channel);
       client.listStatus(ListStatusPRequest.getDefaultInstance());

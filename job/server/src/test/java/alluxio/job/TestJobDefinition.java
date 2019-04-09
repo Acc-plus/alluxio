@@ -38,14 +38,13 @@ public final class TestJobDefinition
 
   @Override
   public SerializableVoid runTask(TestJobConfig config, SerializableVoid args,
-      RunTaskContext jobWorkerContext) throws Exception {
+      JobWorkerContext jobWorkerContext) throws Exception {
     return null;
   }
 
   @Override
   public Map<WorkerInfo, SerializableVoid> selectExecutors(TestJobConfig config,
-      List<WorkerInfo> jobWorkerInfoList, SelectExecutorsContext selectExecutorsContext)
-      throws Exception {
+      List<WorkerInfo> jobWorkerInfoList, JobMasterContext jobMasterContext) throws Exception {
     return null;
   }
 }

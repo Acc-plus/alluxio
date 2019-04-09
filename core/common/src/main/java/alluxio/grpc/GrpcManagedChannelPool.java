@@ -3,8 +3,6 @@ package alluxio.grpc;
 import alluxio.collections.Pair;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.resource.LockResource;
-import alluxio.util.ConfigurationUtils;
-import alluxio.util.ThreadFactoryUtils;
 import alluxio.util.CommonUtils;
 import alluxio.util.WaitForOptions;
 
@@ -232,7 +230,9 @@ public class GrpcManagedChannelPool {
     if (channelKey.mEventLoopGroup.isPresent()) {
       channelBuilder.eventLoopGroup(channelKey.mEventLoopGroup.get());
     }
-    channelBuilder.usePlaintext();
+    if (channelKey.mPlain) {
+      channelBuilder.usePlaintext();
+    }
     return channelBuilder.build();
   }
 
@@ -288,6 +288,7 @@ public class GrpcManagedChannelPool {
    */
   public static class ChannelKey {
     private SocketAddress mAddress;
+    private boolean mPlain = true;
     private Optional<Pair<Long, TimeUnit>> mKeepAliveTime = Optional.empty();
     private Optional<Pair<Long, TimeUnit>> mKeepAliveTimeout = Optional.empty();
     private Optional<Integer> mMaxInboundMessageSize = Optional.empty();
@@ -308,6 +309,16 @@ public class GrpcManagedChannelPool {
      */
     public ChannelKey setAddress(SocketAddress address) {
       mAddress = address;
+      return this;
+    }
+
+    /**
+     * Plaintext channel with no transport security.
+     *
+     * @return the modified {@link ChannelKey}
+     */
+    public ChannelKey usePlaintext() {
+      mPlain = true;
       return this;
     }
 
@@ -394,6 +405,7 @@ public class GrpcManagedChannelPool {
     public int hashCode() {
       return new HashCodeBuilder()
           .append(mAddress)
+          .append(mPlain)
           .append(mKeepAliveTime)
           .append(mKeepAliveTimeout)
           .append(mMaxInboundMessageSize)
@@ -411,6 +423,7 @@ public class GrpcManagedChannelPool {
       if (other instanceof ChannelKey) {
         ChannelKey otherKey = (ChannelKey) other;
         return mAddress.equals(otherKey.mAddress)
+            && mPlain == otherKey.mPlain
             && mKeepAliveTime.equals(otherKey.mKeepAliveTime)
             && mKeepAliveTimeout.equals(otherKey.mKeepAliveTimeout)
             && mFlowControlWindow.equals(otherKey.mFlowControlWindow)
@@ -426,6 +439,7 @@ public class GrpcManagedChannelPool {
     public String toString() {
       return MoreObjects.toStringHelper(this)
           .add("Address", mAddress)
+          .add("IsPlain", mPlain)
           .add("KeepAliveTime", mKeepAliveTime)
           .add("KeepAliveTimeout", mKeepAliveTimeout)
           .add("FlowControlWindow", mFlowControlWindow)

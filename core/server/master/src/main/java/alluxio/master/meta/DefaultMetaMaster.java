@@ -23,7 +23,6 @@ import alluxio.conf.PropertyKey;
 import alluxio.conf.ServerConfiguration;
 import alluxio.exception.ExceptionMessage;
 import alluxio.exception.status.NotFoundException;
-import alluxio.grpc.BackupPOptions;
 import alluxio.grpc.ConfigProperty;
 import alluxio.grpc.GetConfigurationPOptions;
 import alluxio.grpc.GrpcService;
@@ -55,6 +54,7 @@ import alluxio.util.executor.ExecutorServiceFactory;
 import alluxio.util.io.PathUtils;
 import alluxio.util.network.NetworkAddressUtils;
 import alluxio.wire.Address;
+import alluxio.wire.BackupOptions;
 import alluxio.wire.BackupResponse;
 import alluxio.wire.ConfigCheckReport;
 
@@ -229,7 +229,8 @@ public final class DefaultMetaMaster extends CoreMaster implements MetaMaster, N
         mDailyBackup.start();
       }
     } else {
-      if (ConfigurationUtils.isHaMode(ServerConfiguration.global())) {
+      boolean haEnabled = ServerConfiguration.getBoolean(PropertyKey.ZOOKEEPER_ENABLED);
+      if (haEnabled) {
         // Standby master should setup MetaMasterSync to communicate with the leader master
         RetryHandlingMetaMasterMasterClient metaMasterClient =
             new RetryHandlingMetaMasterMasterClient(MasterClientContext
@@ -254,11 +255,13 @@ public final class DefaultMetaMaster extends CoreMaster implements MetaMaster, N
   }
 
   @Override
-  public BackupResponse backup(BackupPOptions options) throws IOException {
-    String dir = options.hasTargetDirectory() ? options.getTargetDirectory()
-        : ServerConfiguration.get(PropertyKey.MASTER_BACKUP_DIRECTORY);
+  public BackupResponse backup(BackupOptions options) throws IOException {
+    String dir = options.getTargetDirectory();
+    if (dir == null) {
+      dir = ServerConfiguration.get(PropertyKey.MASTER_BACKUP_DIRECTORY);
+    }
     UnderFileSystem ufs = mUfs;
-    if (options.getLocalFileSystem() && !ufs.getUnderFSType().equals("local")) {
+    if (options.isLocalFileSystem() && !ufs.getUnderFSType().equals("local")) {
       ufs = UnderFileSystem.Factory.create("/", UnderFileSystemConfiguration.defaults());
       LOG.info("Backing up to local filesystem in directory {}", dir);
     } else {
@@ -292,7 +295,7 @@ public final class DefaultMetaMaster extends CoreMaster implements MetaMaster, N
       }
     }
     String rootUfs = ServerConfiguration.get(PropertyKey.MASTER_MOUNT_TABLE_ROOT_UFS);
-    if (options.getLocalFileSystem()) {
+    if (options.isLocalFileSystem()) {
       rootUfs = "file:///";
     }
     AlluxioURI backupUri = new AlluxioURI(new AlluxioURI(rootUfs), new AlluxioURI(backupFilePath));

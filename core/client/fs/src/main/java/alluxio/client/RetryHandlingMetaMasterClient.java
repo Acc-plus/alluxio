@@ -71,8 +71,10 @@ public class RetryHandlingMetaMasterClient extends AbstractMasterClient
   }
 
   @Override
-  public BackupResponse backup(BackupPOptions options) throws IOException {
-    return retryRPC(() -> BackupResponse.fromProto(mClient.backup(options)));
+  public BackupResponse backup(String targetDirectory,
+                                            boolean localFileSystem) throws IOException {
+    return retryRPC(() -> BackupResponse.fromPoto(mClient.backup(BackupPOptions.newBuilder()
+        .setTargetDirectory(targetDirectory).setLocalFileSystem(localFileSystem).build())));
   }
 
   @Override

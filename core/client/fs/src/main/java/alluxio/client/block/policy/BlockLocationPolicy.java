@@ -12,6 +12,7 @@
 package alluxio.client.block.policy;
 
 import alluxio.annotation.PublicApi;
+import alluxio.client.block.policy.options.CreateOptions;
 import alluxio.client.block.policy.options.GetWorkerOptions;
 import alluxio.conf.AlluxioConfiguration;
 import alluxio.util.CommonUtils;
@@ -44,16 +45,23 @@ public interface BlockLocationPolicy {
     /**
      * Factory for creating {@link BlockLocationPolicy}.
      *
-     * @param conf Alluxio configuration
+     * @param options the block location policy creation options
      * @return a new instance of {@link BlockLocationPolicy}
      */
-    public static BlockLocationPolicy create(String blockLocationPolicyClass,
-        AlluxioConfiguration conf) {
+    public static BlockLocationPolicy create(CreateOptions options,
+        AlluxioConfiguration alluxioConf) {
+      int numShards = options.getDeterministicHashPolicyNumShards();
       try {
-        Class<BlockLocationPolicy> clazz = (Class<BlockLocationPolicy>) Class
-            .forName(blockLocationPolicyClass);
-        return CommonUtils.createNewClassInstance(clazz, new Class[] {AlluxioConfiguration.class},
-            new Object[] {conf});
+        Class<BlockLocationPolicy> clazz =
+            (Class<BlockLocationPolicy>) Class.forName(options.getLocationPolicyClassName());
+        if (numShards > 1) {
+          return CommonUtils.createNewClassInstance(clazz,
+              new Class[] {Integer.class},
+              new Object[] {numShards});
+        } else {
+          return CommonUtils.createNewClassInstance(clazz, new Class[] {AlluxioConfiguration.class},
+              new Object[] {alluxioConf});
+        }
       } catch (ClassNotFoundException e) {
         throw new RuntimeException(e);
       }

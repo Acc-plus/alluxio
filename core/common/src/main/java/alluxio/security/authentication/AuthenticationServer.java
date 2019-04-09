@@ -12,12 +12,12 @@
 package alluxio.security.authentication;
 
 import alluxio.exception.status.UnauthenticatedException;
-import alluxio.grpc.ChannelAuthenticationScheme;
 
 import io.grpc.BindableService;
+import io.grpc.ServerInterceptor;
 
-import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -28,33 +28,27 @@ public interface AuthenticationServer extends BindableService {
    * Registers new user against given channel.
    *
    * @param channelId channel id
-   * @param userInfo authanticated user info
+   * @param authorizedUser authorized user name
    * @param saslServer server that has been used for authentication
    */
-  void registerChannel(UUID channelId, AuthenticatedUserInfo userInfo, SaslServer saslServer);
+  public void registerChannel(UUID channelId, String authorizedUser, SaslServer saslServer);
 
   /**
    * @param channelId channel id
-   * @return info of user that is authenticated with the given channel
+   * @return user name associated with the given channel
    * @throws UnauthenticatedException if given channel is not registered
    */
-  AuthenticatedUserInfo getUserInfoForChannel(UUID channelId) throws UnauthenticatedException;
+  public String getUserNameForChannel(UUID channelId) throws UnauthenticatedException;
 
   /**
    * Unregisters given channel.
    *
    * @param channelId channel id
    */
-  void unregisterChannel(UUID channelId);
+  public void unregisterChannel(UUID channelId);
 
   /**
-   * Creates server-side Sasl handler for given scheme.
-   *
-   * @param scheme the authentication scheme
-   * @return the created {@link SaslServerHandler} instance
-   * @throws SaslException
-   * @throws UnauthenticatedException
+   * @return list of server-side interceptors that are required for configured authentication type
    */
-  SaslServerHandler createSaslHandler(ChannelAuthenticationScheme scheme)
-      throws SaslException, UnauthenticatedException;
+  public List<ServerInterceptor> getInterceptors();
 }

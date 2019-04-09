@@ -11,16 +11,11 @@
 
 package alluxio.master.job;
 
-import static org.mockito.Mockito.mock;
-
-import alluxio.client.file.FileSystem;
-import alluxio.client.file.FileSystemContext;
 import alluxio.grpc.JobCommand;
 import alluxio.job.JobConfig;
 import alluxio.job.JobDefinition;
 import alluxio.job.JobDefinitionRegistry;
-import alluxio.job.JobServerContext;
-import alluxio.job.SelectExecutorsContext;
+import alluxio.job.JobMasterContext;
 import alluxio.job.wire.Status;
 import alluxio.job.wire.TaskInfo;
 import alluxio.master.job.command.CommandManager;
@@ -48,25 +43,19 @@ import java.util.Map;
  * Tests {@link JobCoordinator}.
  */
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({JobDefinitionRegistry.class, FileSystemContext.class})
+@PrepareForTest({JobDefinitionRegistry.class})
 public final class JobCoordinatorTest {
   private WorkerInfo mWorkerInfo;
   private long mJobId;
   private JobConfig mJobconfig;
-  private JobServerContext mJobServerContext;
   private CommandManager mCommandManager;
-  private JobDefinition<JobConfig, Serializable, Serializable> mJobDefinition;
   private List<WorkerInfo> mWorkerInfoList;
+  private JobDefinition<JobConfig, Serializable, Serializable> mJobDefinition;
+  private UfsManager mUfsManager;
 
   @Before
   public void before() throws Exception {
     mCommandManager = new CommandManager();
-
-    // Create mock JobServerContext
-    FileSystem fs = mock(FileSystem.class);
-    FileSystemContext fsCtx = PowerMockito.mock(FileSystemContext.class);
-    UfsManager ufsManager = Mockito.mock(UfsManager.class);
-    mJobServerContext = new JobServerContext(fs, fsCtx, ufsManager);
 
     // Create mock job info.
     mJobconfig = Mockito.mock(JobConfig.class, Mockito.withSettings().serializable());
@@ -86,13 +75,14 @@ public final class JobCoordinatorTest {
     mWorkerInfo = new WorkerInfo();
     mWorkerInfo.setId(0);
     mWorkerInfoList = Lists.newArrayList(mWorkerInfo);
+
+    mUfsManager = Mockito.mock(UfsManager.class);
   }
 
   @Test
   public void createJobCoordinator() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator.create(
-        mCommandManager, mJobServerContext, mWorkerInfoList, mJobId, mJobconfig, null);
+    JobCoordinator.create(mCommandManager, mUfsManager, mWorkerInfoList, mJobId, mJobconfig, null);
 
     List<JobCommand> commands = mCommandManager.pollAllPendingCommands(mWorkerInfo.getId());
     Assert.assertEquals(1, commands.size());
@@ -103,7 +93,7 @@ public final class JobCoordinatorTest {
   @Test
   public void updateStatusFailure() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     setTasksWithStatuses(jobCoordinator, Status.RUNNING, Status.FAILED, Status.COMPLETED);
 
@@ -115,7 +105,7 @@ public final class JobCoordinatorTest {
   @Test
   public void updateStatusFailureOverCancel() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     setTasksWithStatuses(jobCoordinator, Status.RUNNING, Status.FAILED, Status.COMPLETED);
 
@@ -125,7 +115,7 @@ public final class JobCoordinatorTest {
   @Test
   public void updateStatusCancel() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     setTasksWithStatuses(jobCoordinator, Status.CANCELED, Status.RUNNING, Status.COMPLETED);
 
@@ -135,7 +125,7 @@ public final class JobCoordinatorTest {
   @Test
   public void updateStatusRunning() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     setTasksWithStatuses(jobCoordinator, Status.COMPLETED, Status.RUNNING, Status.COMPLETED);
 
@@ -145,7 +135,7 @@ public final class JobCoordinatorTest {
   @Test
   public void updateStatusCompleted() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     setTasksWithStatuses(jobCoordinator, Status.COMPLETED, Status.COMPLETED, Status.COMPLETED);
 
@@ -161,7 +151,7 @@ public final class JobCoordinatorTest {
         .when(mJobDefinition.join(Mockito.eq(mJobconfig),
             Mockito.anyMapOf(WorkerInfo.class, Serializable.class)))
         .thenThrow(new UnsupportedOperationException("test exception"));
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     setTasksWithStatuses(jobCoordinator, Status.COMPLETED, Status.COMPLETED, Status.COMPLETED);
 
@@ -172,7 +162,7 @@ public final class JobCoordinatorTest {
   @Test
   public void noTasks() throws Exception {
     mockSelectExecutors();
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     Assert.assertEquals(Status.COMPLETED, jobCoordinator.getJobInfoWire().getStatus());
   }
@@ -180,7 +170,7 @@ public final class JobCoordinatorTest {
   @Test
   public void failWorker() throws Exception {
     mockSelectExecutors(mWorkerInfo);
-    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mJobServerContext,
+    JobCoordinator jobCoordinator = JobCoordinator.create(mCommandManager, mUfsManager,
         mWorkerInfoList, mJobId, mJobconfig, null);
     jobCoordinator.failTasksForWorker(mWorkerInfo.getId());
     Assert.assertEquals(Status.FAILED, jobCoordinator.getJobInfoWire().getStatus());
@@ -196,7 +186,7 @@ public final class JobCoordinatorTest {
     }
     Mockito
         .when(mJobDefinition.selectExecutors(Mockito.eq(mJobconfig),
-            Mockito.eq(Lists.newArrayList(mWorkerInfo)), Mockito.any(SelectExecutorsContext.class)))
+            Mockito.eq(Lists.newArrayList(mWorkerInfo)), Mockito.any(JobMasterContext.class)))
         .thenReturn(taskAddressToArgs);
   }
 

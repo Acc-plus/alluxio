@@ -17,7 +17,7 @@ import alluxio.conf.PropertyKey;
 import alluxio.client.file.FileOutStream;
 import alluxio.client.file.FileSystem;
 import alluxio.client.file.URIStatus;
-import alluxio.client.block.policy.LocalFirstPolicy;
+import alluxio.client.file.policy.LocalFirstPolicy;
 import alluxio.grpc.CreateFilePOptions;
 import alluxio.grpc.DeletePOptions;
 import alluxio.grpc.WritePType;
@@ -68,10 +68,7 @@ public class SpecificTierWriteIntegrationTest extends BaseIntegrationTest {
           .setProperty(PropertyKey.Template.WORKER_TIERED_STORE_LEVEL_DIRS_PATH.format(2),
               Files.createTempDir().getAbsolutePath())
           .setProperty(PropertyKey.Template.WORKER_TIERED_STORE_LEVEL_DIRS_QUOTA.format(2),
-              String.valueOf(CAPACITY_BYTES))
-          .setProperty(PropertyKey.USER_BLOCK_WRITE_LOCATION_POLICY,
-              LocalFirstPolicy.class.getTypeName())
-          .build();
+              String.valueOf(CAPACITY_BYTES)).build();
 
   @ClassRule
   public static ManuallyScheduleHeartbeat sManuallySchedule =
@@ -98,7 +95,8 @@ public class SpecificTierWriteIntegrationTest extends BaseIntegrationTest {
   private void writeFileAndCheckUsage(int writeTier, long memBytes, long ssdBytes, long hddBytes)
       throws Exception {
     CreateFilePOptions createOptions = CreateFilePOptions.newBuilder().setWriteTier(writeTier)
-        .setWriteType(WritePType.MUST_CACHE).build();
+        .setWriteType(WritePType.MUST_CACHE)
+        .setFileWriteLocationPolicy(LocalFirstPolicy.class.getTypeName()).build();
     FileOutStream os = mFileSystem.createFile(
         new AlluxioURI("/tier-" + writeTier + "_" + CommonUtils.randomAlphaNumString(5)),
         createOptions);

@@ -11,10 +11,6 @@
 
 package alluxio.master.file.meta;
 
-import static org.mockito.Mockito.mock;
-
-import alluxio.master.metastore.InodeStore;
-
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.junit.Assert;
@@ -51,7 +47,7 @@ public final class TtlBucketListTest {
    */
   @Before
   public void before() {
-    mBucketList = new TtlBucketList(mock(InodeStore.class));
+    mBucketList = new TtlBucketList();
   }
 
   private List<TtlBucket> getSortedExpiredBuckets(long expireTime) {

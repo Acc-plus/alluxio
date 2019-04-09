@@ -51,47 +51,41 @@ public final class LocalAlluxioMaster {
 
   private final ClientPool mClientPool = new ClientPool(mClientSupplier);
 
-  private final boolean mIncludeSecondary;
-
   private AlluxioMasterProcess mMasterProcess;
   private Thread mMasterThread;
 
   private AlluxioSecondaryMaster mSecondaryMaster;
   private Thread mSecondaryMasterThread;
 
-  private LocalAlluxioMaster(boolean includeSecondary) {
+  private LocalAlluxioMaster() {
     mHostname = NetworkAddressUtils.getConnectHost(ServiceType.MASTER_RPC,
         ServerConfiguration.global());
     mJournalFolder = ServerConfiguration.get(PropertyKey.MASTER_JOURNAL_FOLDER);
-    mIncludeSecondary = includeSecondary;
   }
 
   /**
    * Creates a new local Alluxio master with an isolated work directory and port.
    *
-   * @param includeSecondary whether to start a secondary master alongside the regular master
    * @return an instance of Alluxio master
    */
-  public static LocalAlluxioMaster create(boolean includeSecondary) throws IOException {
+  public static LocalAlluxioMaster create() throws IOException {
     String workDirectory = uniquePath();
     FileUtils.deletePathRecursively(workDirectory);
     ServerConfiguration.set(PropertyKey.WORK_DIR, workDirectory);
-    return create(workDirectory, includeSecondary);
+    return create(workDirectory);
   }
 
   /**
    * Creates a new local Alluxio master with a isolated port.
    *
    * @param workDirectory Alluxio work directory, this method will create it if it doesn't exist yet
-   * @param includeSecondary whether to start a secondary master alongside the regular master
    * @return the created Alluxio master
    */
-  public static LocalAlluxioMaster create(String workDirectory, boolean includeSecondary)
-      throws IOException {
+  public static LocalAlluxioMaster create(final String workDirectory) throws IOException {
     if (!Files.isDirectory(Paths.get(workDirectory))) {
       Files.createDirectory(Paths.get(workDirectory));
     }
-    return new LocalAlluxioMaster(includeSecondary);
+    return new LocalAlluxioMaster();
   }
 
   /**
@@ -121,9 +115,6 @@ public final class LocalAlluxioMaster {
     // Don't start a secondary master when using the Raft journal.
     if (ServerConfiguration.getEnum(PropertyKey.MASTER_JOURNAL_TYPE,
         JournalType.class) == JournalType.EMBEDDED) {
-      return;
-    }
-    if (!mIncludeSecondary) {
       return;
     }
     mSecondaryMaster = new AlluxioSecondaryMaster();

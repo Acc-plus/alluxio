@@ -19,8 +19,6 @@ import alluxio.conf.ServerConfiguration;
 import alluxio.master.NoopMaster;
 import alluxio.master.journal.JournalReader;
 import alluxio.master.journal.JournalReader.State;
-import alluxio.master.journal.checkpoint.CheckpointOutputStream;
-import alluxio.master.journal.checkpoint.CheckpointType;
 import alluxio.proto.journal.Journal;
 import alluxio.underfs.UnderFileSystem;
 import alluxio.util.CommonUtils;
@@ -274,9 +272,7 @@ public final class UfsJournalReaderTest {
     byte[] bytes = CommonUtils.randomAlphaNumString(10).getBytes();
     try (UfsJournalCheckpointWriter writer =
         UfsJournalCheckpointWriter.create(mJournal, sequenceNumber)) {
-      CheckpointOutputStream stream =
-          new CheckpointOutputStream(writer, CheckpointType.JOURNAL_ENTRY);
-      stream.write(bytes);
+      writer.write(bytes);
     }
     return bytes;
   }

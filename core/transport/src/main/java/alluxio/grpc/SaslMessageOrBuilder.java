@@ -40,11 +40,16 @@ public interface SaslMessageOrBuilder extends
       getClientIdBytes();
 
   /**
-   * <code>optional .alluxio.grpc.sasl.ChannelAuthenticationScheme authenticationScheme = 4;</code>
+   * <code>optional string authenticationName = 4;</code>
    */
-  boolean hasAuthenticationScheme();
+  boolean hasAuthenticationName();
   /**
-   * <code>optional .alluxio.grpc.sasl.ChannelAuthenticationScheme authenticationScheme = 4;</code>
+   * <code>optional string authenticationName = 4;</code>
    */
-  alluxio.grpc.ChannelAuthenticationScheme getAuthenticationScheme();
+  java.lang.String getAuthenticationName();
+  /**
+   * <code>optional string authenticationName = 4;</code>
+   */
+  com.google.protobuf.ByteString
+      getAuthenticationNameBytes();
 }

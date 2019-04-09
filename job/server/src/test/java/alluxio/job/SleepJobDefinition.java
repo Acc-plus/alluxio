@@ -37,8 +37,7 @@ public final class SleepJobDefinition
 
   @Override
   public Map<WorkerInfo, SerializableVoid> selectExecutors(SleepJobConfig config,
-      List<WorkerInfo> jobWorkerInfoList, SelectExecutorsContext selectExecutorsContext)
-      throws Exception {
+      List<WorkerInfo> jobWorkerInfoList, JobMasterContext jobMasterContext) throws Exception {
     Map<WorkerInfo, SerializableVoid> executors = new HashMap<>();
     for (WorkerInfo jobWorker : jobWorkerInfoList) {
       executors.put(jobWorker, null);
@@ -48,7 +47,7 @@ public final class SleepJobDefinition
 
   @Override
   public SerializableVoid runTask(SleepJobConfig config, SerializableVoid args,
-      RunTaskContext runTaskContext) throws Exception {
+      JobWorkerContext jobWorkerContext) throws Exception {
     CommonUtils.sleepMs(config.getTimeMs());
     return null;
   }

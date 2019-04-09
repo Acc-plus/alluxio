@@ -23,7 +23,6 @@ import alluxio.underfs.UnderFileSystem;
 import alluxio.underfs.options.DeleteOptions;
 import alluxio.util.CommonUtils;
 import alluxio.util.WaitForOptions;
-import alluxio.util.io.PathUtils;
 import alluxio.zookeeper.RestartableTestingServer;
 
 import com.google.common.base.Throwables;
@@ -222,9 +221,7 @@ public final class MultiMasterLocalAlluxioCluster extends AbstractLocalAlluxioCl
     ServerConfiguration.set(PropertyKey.ZOOKEEPER_LEADER_PATH, "/leader");
 
     for (int k = 0; k < mNumOfMasters; k++) {
-      ServerConfiguration.set(PropertyKey.MASTER_METASTORE_DIR,
-          PathUtils.concatPath(mWorkDirectory, "metastore-" + k));
-      final LocalAlluxioMaster master = LocalAlluxioMaster.create(mWorkDirectory, false);
+      final LocalAlluxioMaster master = LocalAlluxioMaster.create(mWorkDirectory);
       master.start();
       LOG.info("master NO.{} started, isServing: {}, address: {}", k, master.isServing(),
           master.getAddress());

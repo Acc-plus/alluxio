@@ -16,9 +16,7 @@ import alluxio.master.file.meta.Inode;
 import alluxio.master.file.meta.InodeLockManager;
 import alluxio.master.file.meta.InodeView;
 import alluxio.master.file.meta.MutableInode;
-import alluxio.master.journal.checkpoint.Checkpointed;
 
-import java.io.Closeable;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -38,7 +36,7 @@ import javax.annotation.concurrent.ThreadSafe;
  * manager locks when making any modifications to the inode store.
  */
 @ThreadSafe
-public interface InodeStore extends ReadOnlyInodeStore, Checkpointed, Closeable {
+public interface InodeStore extends ReadOnlyInodeStore {
   /**
    * Gets a mutable representation of the specified inode.
    *
@@ -168,15 +166,12 @@ public interface InodeStore extends ReadOnlyInodeStore, Checkpointed, Closeable 
    */
   void removeChild(long parentId, String name);
 
-  @Override
-  default void close() {}
-
   /**
    * Used to perform batched writes. Call {@link #createWriteBatch()} to use batched writes.
    *
    * Write batches may or may not be applied atomically.
    */
-  interface WriteBatch extends AutoCloseable {
+  interface WriteBatch {
     /**
      * Adds an inode to the write batch. This method serializes the inode, so future modifications
      * to the inode will not affect the write batch.
@@ -213,9 +208,6 @@ public interface InodeStore extends ReadOnlyInodeStore, Checkpointed, Closeable 
      * Performs the batched write.
      */
     void commit();
-
-    @Override
-    void close();
   }
 
   /**

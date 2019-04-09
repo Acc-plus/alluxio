@@ -39,7 +39,6 @@ import com.google.common.base.Throwables;
 import org.powermock.reflect.Whitebox;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -139,20 +138,9 @@ public final class IntegrationTestUtils {
    *
    * @param masterName the name of the master
    */
-  public static void waitForUfsJournalCheckpoint(String masterName)
+  public static void waitForCheckpoint(String masterName)
       throws TimeoutException, InterruptedException {
-    waitForUfsJournalCheckpoint(masterName, JournalUtils.getJournalLocation());
-  }
-
-  /**
-   * Waits for a checkpoint to be written in the specified master's journal.
-   *
-   * @param masterName the name of the master
-   * @param journalLocation the location of the journal
-   */
-  public static void waitForUfsJournalCheckpoint(String masterName, URI journalLocation)
-      throws TimeoutException, InterruptedException {
-    UfsJournal journal = new UfsJournal(URIUtils.appendPathOrDie(journalLocation,
+    UfsJournal journal = new UfsJournal(URIUtils.appendPathOrDie(JournalUtils.getJournalLocation(),
         masterName), new NoopMaster(""), 0);
     CommonUtils.waitFor("checkpoint to be written", () -> {
       UfsJournalSnapshot snapshot;
